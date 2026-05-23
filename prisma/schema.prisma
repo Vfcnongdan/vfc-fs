@@ -26,9 +26,20 @@ model User {
   saleProfile   SaleProfile?
   crops         UserCrop[]
 
+  parentId String? @map("parent_id")
+  parent   User?   @relation("UserHierarchy", fields: [parentId], references: [id])
+  children User[]  @relation("UserHierarchy")
+
+  inventories  Inventory[]
+  b2bPurchases B2bOrder[]  @relation("B2bBuyer")
+  b2bSales     B2bOrder[]  @relation("B2bSeller")
+  b2cPurchases B2cOrder[]  @relation("B2cBuyer")
+  b2cSales     B2cOrder[]  @relation("B2cSeller")
+
   @@index([phone])
   @@index([zaloId])
   @@index([role])
+  @@index([parentId])
   @@map("users")
 }
 
@@ -154,6 +165,10 @@ model ProductDetail {
   updatedAt        DateTime @updatedAt @map("updated_at")
   product          Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
+  inventories   Inventory[]
+  b2bOrderItems B2bOrderItem[]
+  b2cOrderItems B2cOrderItem[]
+
   @@map("product_details")
 }
 
@@ -222,6 +237,84 @@ model DiagnosisSuggestion {
   product     Product?       @relation(fields: [productId], references: [id])
 
   @@map("diagnosis_suggestions")
+}
+
+model Inventory {
+  id              String   @id @default(cuid())
+  ownerId         String   @map("owner_id")
+  productDetailId String   @map("product_detail_id")
+  quantity        Int      @default(0)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  owner         User          @relation(fields: [ownerId], references: [id])
+  productDetail ProductDetail @relation(fields: [productDetailId], references: [id])
+
+  @@unique([ownerId, productDetailId])
+  @@index([ownerId])
+  @@map("inventories")
+}
+
+model B2bOrder {
+  id          String      @id @default(cuid())
+  buyerId     String      @map("buyer_id")
+  sellerId    String      @map("seller_id")
+  totalAmount Decimal     @map("total_amount") @db.Decimal(12, 2)
+  status      OrderStatus @default(PENDING)
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  buyer  User           @relation("B2bBuyer", fields: [buyerId], references: [id])
+  seller User           @relation("B2bSeller", fields: [sellerId], references: [id])
+  items  B2bOrderItem[]
+
+  @@index([buyerId, createdAt])
+  @@index([sellerId, createdAt])
+  @@map("b2b_orders")
+}
+
+model B2bOrderItem {
+  id              String  @id @default(cuid())
+  orderId         String  @map("order_id")
+  productDetailId String  @map("product_detail_id")
+  quantity        Int
+  price           Decimal @db.Decimal(12, 2)
+
+  order         B2bOrder      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productDetail ProductDetail @relation(fields: [productDetailId], references: [id])
+
+  @@map("b2b_order_items")
+}
+
+model B2cOrder {
+  id          String      @id @default(cuid())
+  buyerId     String      @map("buyer_id")
+  sellerId    String      @map("seller_id")
+  totalAmount Decimal     @map("total_amount") @db.Decimal(12, 2)
+  status      OrderStatus @default(PENDING)
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  buyer  User           @relation("B2cBuyer", fields: [buyerId], references: [id])
+  seller User           @relation("B2cSeller", fields: [sellerId], references: [id])
+  items  B2cOrderItem[]
+
+  @@index([buyerId, createdAt])
+  @@index([sellerId, createdAt])
+  @@map("b2c_orders")
+}
+
+model B2cOrderItem {
+  id              String  @id @default(cuid())
+  orderId         String  @map("order_id")
+  productDetailId String  @map("product_detail_id")
+  quantity        Int
+  price           Decimal @db.Decimal(12, 2)
+
+  order         B2cOrder      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productDetail ProductDetail @relation(fields: [productDetailId], references: [id])
+
+  @@map("b2c_order_items")
 }
 
 model ChatMessage {

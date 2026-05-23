@@ -7,6 +7,8 @@ const ROLE_PATHS: Record<string, Role[]> = {
   "/api/admin": [Role.ADMIN],
   "/sale": [Role.SALE, Role.ADMIN],
   "/api/sale": [Role.SALE, Role.ADMIN],
+  "/agent": [Role.SUPER_AGENT, Role.AGENCY, Role.ADMIN],
+  "/api/agent": [Role.SUPER_AGENT, Role.AGENCY, Role.ADMIN],
 };
 
 function matchesPrefix(pathname: string, prefixes: string[]): boolean {

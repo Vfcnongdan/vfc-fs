@@ -36,6 +36,15 @@ export default function AdminDashboard() {
               <span className="text-xs font-medium text-neutral-600 text-center">Quản lý người dùng</span>
             </Link>
           </div>
+        ) : role === "AGENCY" || role === "SUPER_AGENT" ? (
+          <div className="grid grid-cols-3 gap-4 sm:grid-cols-6">
+            <Link href="/agent/inventory" className="flex flex-col items-center gap-2 group">
+              <div className="aspect-square w-full relative rounded-2xl bg-emerald-50 shadow-sm ring-1 ring-emerald-200 overflow-hidden transition group-hover:shadow-md group-hover:bg-emerald-100 group-active:scale-95 flex items-center justify-center">
+                <span className="text-4xl">📦</span>
+              </div>
+              <span className="text-xs font-medium text-neutral-600 text-center">Quản lý hàng hóa</span>
+            </Link>
+          </div>
         ) : role !== null ? (
           <div className="flex flex-col items-center justify-center py-20 text-center text-neutral-400">
             <span className="text-5xl mb-4">🔒</span>
