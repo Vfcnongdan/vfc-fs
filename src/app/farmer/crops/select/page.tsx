@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
+import { getCropIcon } from "@/lib/cropIcons";
 
 interface Crop {
   id: string;
@@ -135,20 +136,16 @@ export default function SelectCropsPage() {
                 className="flex flex-col items-center gap-2 group"
               >
                 <div
-                  className={`relative w-10 h-10 rounded-full overflow-hidden transition-all ${selectedIds.includes(crop.id) ? "ring-2 ring-[#FFD680]" : "ring-1 ring-white/20"}`}
+                  className={`relative w-10 h-10 rounded-full overflow-hidden transition-all flex items-center justify-center ${
+                    selectedIds.includes(crop.id)
+                      ? "ring-2 ring-[#FFD680]"
+                      : "ring-1 ring-white/20"
+                  }`}
+                  style={{ backgroundColor: getCropIcon(crop.cropCode).bg + "cc" }}
                 >
-                  {/* Default icon if no image */}
-                  <div className="absolute inset-0 bg-white/10 flex items-center justify-center">
-                    <span className="text-xl">🌱</span>
-                  </div>
-                  {crop.imageUrl && (
-                    <Image
-                      src={crop.imageUrl}
-                      alt={crop.name}
-                      fill
-                      className="object-cover"
-                    />
-                  )}
+                  <span className="text-2xl leading-none select-none">
+                    {getCropIcon(crop.cropCode).emoji}
+                  </span>
                   {selectedIds.includes(crop.id) && (
                     <div className="absolute inset-0 bg-green-500/40 flex items-center justify-center">
                       <div className="bg-green-500 rounded-full p-0.5 shadow-lg">

@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Camera, Package, MapPin, Plus, Sprout } from "lucide-react";
+import { Camera, Package, MapPin, Plus } from "lucide-react";
+import { getCropIcon } from "@/lib/cropIcons";
 import { useCropStore } from "@/store/useCropStore";
 
 export default function FarmerHomePage() {
@@ -79,17 +80,26 @@ export default function FarmerHomePage() {
                 className="flex flex-col items-center gap-1.5 shrink-0 snap-start w-[54px]"
               >
                 <div className="relative w-[50px] h-[50px]">
-                  <div className="w-full h-full rounded-full overflow-hidden ring-1 ring-[#FFD680] bg-white/10 flex items-center justify-center">
-                    <Sprout className="text-[#FFD680]/50" size={24} />
-                    {crop.imageUrl && (
-                      <Image
-                        src={crop.imageUrl}
-                        alt={crop.name}
-                        fill
-                        className="object-cover"
-                      />
-                    )}
-                  </div>
+                  {(() => {
+                    const icon = getCropIcon(crop.cropCode);
+                    return (
+                      <div
+                        className="w-full h-full rounded-full overflow-hidden ring-1 ring-[#FFD680] flex items-center justify-center"
+                        style={{ backgroundColor: icon.bg + "cc" }}
+                      >
+                        {crop.imageUrl ? (
+                          <Image
+                            src={crop.imageUrl}
+                            alt={crop.name}
+                            fill
+                            className="object-cover"
+                          />
+                        ) : (
+                          <span className="text-2xl leading-none select-none">{icon.emoji}</span>
+                        )}
+                      </div>
+                    );
+                  })()}
                   <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full">
                     <span className="block text-[7px] font-bold text-center text-white leading-tight break-words px-1.5">
                       {crop.name}

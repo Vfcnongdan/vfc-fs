@@ -33,6 +33,79 @@ export default function DiagnosePage() {
   const [result, setResult] = useState<DiagnosisResult | null>(null);
   const [error, setError] = useState("");
   const [blockedTimeRemaining, setBlockedTimeRemaining] = useState<number>(0);
+  const [agencies, setAgencies] = useState<any[]>([]);
+  const [loadingAgencies, setLoadingAgencies] = useState(false);
+  const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
+  const [selectedAgency, setSelectedAgency] = useState<any>(null);
+  const [selectedProduct, setSelectedProduct] = useState<any>(null);
+  const [farmArea, setFarmArea] = useState<string>("1.0");
+
+  const fetchFallbackAgencies = async () => {
+    // Tọa độ mặc định ở An Giang
+    const defaultLat = 10.8403;
+    const defaultLon = 105.1800;
+    try {
+      const res = await fetch(`/api/farmer/agencies?latitude=${defaultLat}&longitude=${defaultLon}`);
+      const data = await res.json();
+      if (res.ok) {
+        setAgencies(data);
+      }
+    } catch (e) {
+      console.error("Failed to fetch fallback agencies:", e);
+    } finally {
+      setLoadingAgencies(false);
+    }
+  };
+
+  const fetchAgencies = () => {
+    setLoadingAgencies(true);
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const { latitude, longitude } = position.coords;
+          try {
+            const res = await fetch(`/api/farmer/agencies?latitude=${latitude}&longitude=${longitude}`);
+            const data = await res.json();
+            if (res.ok) {
+              setAgencies(data);
+            } else {
+              await fetchFallbackAgencies();
+            }
+          } catch (e) {
+            await fetchFallbackAgencies();
+          } finally {
+            setLoadingAgencies(false);
+          }
+        },
+        async (error) => {
+          console.warn("Geolocation error, using fallback:", error);
+          await fetchFallbackAgencies();
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0,
+        }
+      );
+    } else {
+      fetchFallbackAgencies();
+    }
+  };
+
+  useEffect(() => {
+    if (result && result.status === "DONE") {
+      fetchAgencies();
+    }
+  }, [result]);
+
+  const handleOpenOrderModal = (agency: any) => {
+    setSelectedAgency(agency);
+    const productSuggestions = result?.suggestions || [];
+    const firstSuggested = productSuggestions[0]?.product;
+    setSelectedProduct(firstSuggested || null);
+    setFarmArea("1.0");
+    setIsOrderModalOpen(true);
+  };
 
   useEffect(() => {
     fetchUserCrops();
@@ -472,8 +545,177 @@ export default function DiagnosePage() {
                   </div>
                 </div>
               )}
+
+              {/* Recommended Agencies Section */}
+              <div className="card flex flex-col gap-4 mt-6">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-blue-600 text-base shadow-sm">
+                    🏢
+                  </span>
+                  <h3 className="text-lg font-bold text-neutral-800">
+                    Đại lý VFC gần nhất hỗ trợ đặt hàng
+                  </h3>
+                </div>
+
+                {loadingAgencies ? (
+                  <div className="flex justify-center items-center py-6">
+                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
+                  </div>
+                ) : agencies.length === 0 ? (
+                  <p className="text-neutral-500 text-sm text-center py-4">Không tìm thấy đại lý nào gần đây.</p>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {agencies.map((agency) => (
+                      <div key={agency.id} className="relative flex flex-col justify-between border border-neutral-200 rounded-2xl p-5 bg-white hover:border-blue-400 hover:shadow-md transition duration-300">
+                        <div className="flex flex-col gap-1.5">
+                          <div className="flex justify-between items-start">
+                            <h4 className="font-bold text-neutral-800 text-base">{agency.name}</h4>
+                            <span className="text-xs font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100/50 flex-shrink-0">
+                              {agency.distance > 1000 
+                                ? `${(agency.distance / 1000).toFixed(1)} km` 
+                                : `${Math.round(agency.distance)} m`}
+                            </span>
+                          </div>
+                          {agency.phone && (
+                            <p className="text-xs text-neutral-500 font-medium">📞 SĐT: {agency.phone}</p>
+                          )}
+                          {agency.address && (
+                            <p className="text-xs text-neutral-600 leading-relaxed mt-1">📍 {agency.address}</p>
+                          )}
+                        </div>
+                        
+                        <button 
+                          onClick={() => handleOpenOrderModal(agency)}
+                          className="mt-4 w-full py-2 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-sm rounded-xl shadow-sm hover:shadow transition duration-200"
+                        >
+                          🛒 Đặt hàng tại đại lý
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </>
           )}
+        </div>
+      )}
+
+      {/* Order Modal */}
+      {isOrderModalOpen && selectedAgency && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/60 backdrop-blur-sm animate-fade-in p-4">
+          <div className="w-full max-w-md bg-white border border-neutral-100 rounded-3xl p-6 shadow-2xl animate-scale-in relative">
+            <button 
+              onClick={() => setIsOrderModalOpen(false)}
+              className="absolute top-4 right-4 text-neutral-400 hover:text-neutral-600 transition text-2xl font-bold"
+            >
+              &times;
+            </button>
+
+            <h3 className="text-xl font-black text-neutral-800 mb-4 flex items-center gap-2">
+              🛒 Đặt hàng thuốc BVTV
+            </h3>
+
+            <div className="flex flex-col gap-4">
+              {/* Agency Name */}
+              <div>
+                <label className="mb-1 block text-xs font-bold text-neutral-500 uppercase tracking-wider">
+                  Đại lý tiếp nhận
+                </label>
+                <input 
+                  type="text" 
+                  value={selectedAgency.name} 
+                  readOnly 
+                  className="input-field bg-neutral-50 text-neutral-600 font-bold border-neutral-200 cursor-not-allowed"
+                />
+              </div>
+
+              {/* Product Select */}
+              <div>
+                <label className="mb-1 block text-xs font-bold text-neutral-500 uppercase tracking-wider">
+                  Tên hàng (Sản phẩm đề xuất)
+                </label>
+                <select
+                  value={selectedProduct?.slug || ""}
+                  onChange={(e) => {
+                    const slug = e.target.value;
+                    const prod = result?.suggestions?.find(s => s.product?.slug === slug)?.product;
+                    setSelectedProduct(prod || null);
+                  }}
+                  className="input-field border-neutral-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                >
+                  {result?.suggestions?.map((s) => (
+                    <option key={s.product?.slug} value={s.product?.slug}>
+                      {s.product?.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Price */}
+              <div>
+                <label className="mb-1 block text-xs font-bold text-neutral-500 uppercase tracking-wider">
+                  Đơn giá
+                </label>
+                <input 
+                  type="text" 
+                  value={selectedProduct?.price 
+                    ? new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(selectedProduct.price)
+                    : "Liên hệ đại lý"
+                  } 
+                  readOnly 
+                  className="input-field bg-neutral-50 text-neutral-600 font-bold border-neutral-200 cursor-not-allowed"
+                />
+              </div>
+
+              {/* Area (ha) */}
+              <div>
+                <label className="mb-1 block text-xs font-bold text-neutral-500 uppercase tracking-wider">
+                  Diện tích (ha)
+                </label>
+                <input 
+                  type="number" 
+                  step="0.1" 
+                  min="0.01"
+                  value={farmArea} 
+                  onChange={(e) => setFarmArea(e.target.value)} 
+                  className="input-field border-neutral-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 font-semibold"
+                  placeholder="Nhập diện tích canh tác"
+                />
+              </div>
+
+              {/* Total Price */}
+              <div className="mt-2 p-4 bg-blue-50/50 border border-blue-100 rounded-2xl">
+                <span className="block text-[10px] font-extrabold text-blue-600 uppercase tracking-widest">
+                  Tổng cộng tạm tính
+                </span>
+                <span className="text-2xl font-black text-blue-700 mt-1 block">
+                  {selectedProduct?.price 
+                    ? new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" })
+                        .format((parseFloat(farmArea) || 0) * selectedProduct.price)
+                    : "Liên hệ đại lý"
+                  }
+                </span>
+              </div>
+
+              <div className="flex gap-3 mt-4">
+                <button 
+                  onClick={() => setIsOrderModalOpen(false)}
+                  className="flex-1 py-2.5 border border-neutral-200 hover:bg-neutral-50 text-neutral-700 font-bold rounded-xl transition"
+                >
+                  Hủy
+                </button>
+                <button 
+                  onClick={() => {
+                    alert("Đặt hàng thành công! (Logic chi tiết sẽ được phát triển sau)");
+                    setIsOrderModalOpen(false);
+                  }}
+                  className="flex-1 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold rounded-xl shadow-md transition"
+                >
+                  Xác nhận
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -357,3 +357,22 @@ enum DiagnosisStatus {
   DONE
   FAILED
 }
+
+model Agency {
+  id           String   @id @default(cuid())
+  code         String   @unique
+  name         String
+  phone        String?
+  taxCode      String?  @map("tax_code")
+  salesman     String?
+  area         String?
+  address      String?
+  latitude     Float
+  longitude    Float
+  wardProvince String?  @map("ward_province")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@index([latitude, longitude])
+  @@map("agencies")
+}

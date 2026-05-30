@@ -10,6 +10,19 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
+function getDirectImageLink(url: string): string {
+  if (!url) return '';
+  if (url.includes('drive.google.com')) {
+    const reg1 = /[\?&]id=([^&#]+)/;
+    const reg2 = /\/d\/([^/]+)/;
+    const match1 = url.match(reg1);
+    if (match1) return `https://lh3.googleusercontent.com/d/${match1[1]}`;
+    const match2 = url.match(reg2);
+    if (match2) return `https://lh3.googleusercontent.com/d/${match2[1]}`;
+  }
+  return url;
+}
+
 async function main() {
   // --- Seed Crops ---
   const cropList = [
@@ -83,6 +96,80 @@ async function main() {
 
   console.log('Seeded crops successfully');
 
+  // --- Seed Products with Image URLs and Prices from Products.csv ---
+  const productsCsvPath = path.join(process.cwd(), 'document', 'Products.csv');
+  const productImagesMap = new Map<string, string>();
+  const productPricesMap = new Map<string, number>();
+
+  if (fs.existsSync(productsCsvPath)) {
+    const fileContent = fs.readFileSync(productsCsvPath, 'utf-8');
+    const records = parse(fileContent, {
+      columns: true,
+      skip_empty_lines: true,
+      trim: true,
+    }) as any[];
+
+    console.log(`Found ${records.length} records in Products.csv`);
+
+    for (const record of records) {
+      const name = record['Product'];
+      let imageLink = record['Image display link'];
+      if (imageLink) {
+        imageLink = getDirectImageLink(imageLink);
+      }
+      const priceStr = record['Price'] || '0';
+      
+      // Parse price, handling potential dots like 1.263.889 -> 1263889
+      const normalizedPrice = priceStr.replace(/\./g, '');
+      const price = parseFloat(normalizedPrice) || 0;
+
+      if (!name) continue;
+
+      const mapKey = name.toLowerCase().trim();
+      if (imageLink) {
+        productImagesMap.set(mapKey, imageLink);
+      }
+      productPricesMap.set(mapKey, price);
+
+      let product = await prisma.product.findFirst({
+        where: { name: { equals: name, mode: 'insensitive' } },
+      });
+
+      const slug = name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-');
+      let finalSlug = slug;
+      let counter = 1;
+      if (!product) {
+        while (await prisma.product.findUnique({ where: { slug: finalSlug } })) {
+          finalSlug = `${slug}-${counter}`;
+          counter++;
+        }
+      }
+
+      const imageUrls = imageLink ? [imageLink] : [];
+
+      if (product) {
+        await prisma.product.update({
+          where: { id: product.id },
+          data: {
+            imageUrls,
+            price: price,
+          },
+        });
+      } else {
+        await prisma.product.create({
+          data: {
+            name,
+            sku: `SKU-${finalSlug.toUpperCase()}`,
+            slug: finalSlug,
+            price: price,
+            imageUrls,
+            isActive: true,
+          },
+        });
+      }
+    }
+  }
+
   // --- Seed Product Details from CSV ---
   const csvFilePath = path.join(process.cwd(), 'document', 'Product details.csv');
   if (fs.existsSync(csvFilePath)) {
@@ -113,7 +200,7 @@ async function main() {
 
       if (!product) {
         console.log(`Product "${name}" not found, creating skeleton product...`);
-        const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        const slug = name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-');
         let finalSlug = slug;
         let counter = 1;
         while (await prisma.product.findUnique({ where: { slug: finalSlug } })) {
@@ -121,12 +208,18 @@ async function main() {
           counter++;
         }
 
+        const mapKey = name.toLowerCase().trim();
+        const imageLink = productImagesMap.get(mapKey);
+        const imageUrls = imageLink ? [imageLink] : [];
+        const price = productPricesMap.get(mapKey) || 0;
+
         product = await prisma.product.create({
           data: {
             name,
             sku: `SKU-${finalSlug.toUpperCase()}`,
             slug: finalSlug,
-            price: 0,
+            price,
+            imageUrls,
             isActive: true,
           },
         });
@@ -158,6 +251,96 @@ async function main() {
     console.log('Seeded product details successfully');
   } else {
     console.warn(`CSV file not found at ${csvFilePath}`);
+  }
+
+  // --- Enable EarthDistance extension (always) ---
+  console.log('Enabling Postgres earthdistance extension...');
+  try {
+    await prisma.$executeRawUnsafe(`CREATE EXTENSION IF NOT EXISTS cube CASCADE;`);
+    await prisma.$executeRawUnsafe(`CREATE EXTENSION IF NOT EXISTS earthdistance CASCADE;`);
+    console.log('Postgres earthdistance extension enabled successfully');
+  } catch (error) {
+    console.error('Failed to enable earthdistance extension:', error);
+  }
+
+  // --- Seed Agencies (LOCAL ONLY) ---
+  // On server, import document/agencies_export.sql manually instead.
+  const isLocal = (process.env.DATABASE_URL || '').includes('localhost');
+  if (!isLocal) {
+    console.log('⚠️  Skipping agency seed: not local environment.');
+    console.log('   → Import agencies_export.sql to the server DB manually.');
+  } else {
+    const agenciesCsvPath = path.join(process.cwd(), 'document', 'agencies.csv');
+    if (fs.existsSync(agenciesCsvPath)) {
+      const fileContent = fs.readFileSync(agenciesCsvPath, 'utf-8');
+      const records = parse(fileContent, {
+        columns: true,
+        skip_empty_lines: true,
+        trim: true,
+        bom: true,
+      }) as any[];
+
+      console.log(`Found ${records.length} records in agencies.csv`);
+
+      const parseCoord = (val: string): number => {
+        if (!val) return 0;
+        const normalized = val.replace(/,/g, '.').replace(/[^\d.-]/g, '');
+        return parseFloat(normalized) || 0;
+      };
+
+      let count = 0;
+      for (const record of records) {
+        const originalId = record['Id'] || record['id'];
+        const code = record['Mã KH'] || record['code'];
+        const name = record['Tên'] || record['name'];
+
+        if (!code || !name) continue;
+
+        const phone = record['Điện thoại'] || null;
+        const taxCode = record['Mã Số Thuế'] || null;
+        const salesman = record['Nhân viên bán hàng'] || null;
+        const area = record['Khu vực'] || null;
+        const address = record['Địa chỉ'] || null;
+        const wardProvince = record['Xã/Tỉnh mới'] || null;
+
+        const latitude = parseCoord(record['Vĩ Độ'] || record['latitude']);
+        const longitude = parseCoord(record['Kinh Độ'] || record['longitude']);
+
+        const agencyId = originalId ? String(originalId) : undefined;
+
+        await prisma.agency.upsert({
+          where: { code },
+          update: {
+            name,
+            phone,
+            taxCode,
+            salesman,
+            area,
+            address,
+            latitude,
+            longitude,
+            wardProvince,
+          },
+          create: {
+            id: agencyId,
+            code,
+            name,
+            phone,
+            taxCode,
+            salesman,
+            area,
+            address,
+            latitude,
+            longitude,
+            wardProvince,
+          },
+        });
+        count++;
+      }
+      console.log(`Successfully seeded ${count} agencies.`);
+    } else {
+      console.warn(`agencies.csv file not found at ${agenciesCsvPath}`);
+    }
   }
 }
 

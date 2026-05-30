@@ -3,6 +3,7 @@ import { create } from 'zustand';
 type Crop = {
   id: string;
   name: string;
+  cropCode: string;
   imageUrl?: string;
 };
 
