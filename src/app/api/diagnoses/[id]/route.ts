@@ -16,7 +16,7 @@ export async function GET(
     include: {
       suggestions: {
         include: {
-          product: { select: { name: true, imageUrls: true, slug: true, price: true } },
+          product: { select: { id: true, name: true, imageUrls: true, slug: true, price: true } },
         },
         orderBy: { rank: "asc" },
       },

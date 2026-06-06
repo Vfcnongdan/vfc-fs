@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getRequestUser, requireRole, apiError, apiOk } from "@/lib/request";
 import { Role } from "@prisma/client";
+import { ensureUserProfile } from "@/lib/userProfile";
 
 export async function GET(
   request: NextRequest,
@@ -14,8 +15,9 @@ export async function GET(
   const targetUser = await prisma.user.findUnique({
     where: { id },
     include: {
-      farmerProfile: true,
+      farmer: true,
       saleProfile: true,
+      profile: true,
     }
   });
 
@@ -32,7 +34,7 @@ export async function PATCH(
   if (!user || !requireRole(user, Role.ADMIN)) return apiError("Unauthorized", 401);
 
   const body = await request.json();
-  const { name, role, isActive } = body;
+  const { name, role, isActive, address, notes, cropIds } = body;
 
   const updatedUser = await prisma.user.update({
     where: { id },
@@ -43,7 +45,80 @@ export async function PATCH(
     }
   });
 
-  return apiOk(updatedUser);
+  const shouldUpdateProfile =
+    address !== undefined || notes !== undefined || cropIds !== undefined;
+
+  if (shouldUpdateProfile) {
+    if (cropIds !== undefined && !Array.isArray(cropIds)) {
+      return apiError("INVALID_CROPS", 400);
+    }
+
+    await ensureUserProfile(id);
+
+    const validCropIds =
+      cropIds !== undefined
+        ? (
+            await prisma.crop.findMany({
+              where: { id: { in: cropIds } },
+              select: { id: true },
+            })
+          ).map((c) => c.id)
+        : null;
+
+    await prisma.$transaction(async (tx) => {
+      const existingProfile = await tx.userProfile.findUnique({
+        where: { userId: id },
+        select: { cropIds: true, address: true, notes: true },
+      });
+
+      const nextAddress =
+        address !== undefined
+          ? (typeof address === "string" && address.trim().length > 0
+              ? address.trim()
+              : null)
+          : existingProfile?.address ?? null;
+
+      const nextNotes =
+        notes !== undefined
+          ? (typeof notes === "string" && notes.trim().length > 0
+              ? notes.trim()
+              : null)
+          : existingProfile?.notes ?? null;
+
+      const nextCropIds = validCropIds ?? existingProfile?.cropIds ?? [];
+
+      await tx.userProfile.upsert({
+        where: { userId: id },
+        create: {
+          userId: id,
+          cropIds: nextCropIds,
+          address: nextAddress,
+          notes: nextNotes,
+        },
+        update: {
+          address: nextAddress,
+          notes: nextNotes,
+          ...(validCropIds ? { cropIds: nextCropIds } : {}),
+        },
+      });
+
+      if (validCropIds) {
+        await tx.userCrop.deleteMany({ where: { userId: id } });
+        if (validCropIds.length > 0) {
+          await tx.userCrop.createMany({
+            data: validCropIds.map((cropId: string) => ({ userId: id, cropId })),
+          });
+        }
+      }
+    });
+  }
+
+  const targetUser = await prisma.user.findUnique({
+    where: { id },
+    include: { profile: true, farmer: true, saleProfile: true },
+  });
+
+  return apiOk(targetUser ?? updatedUser);
 }
 
 export async function DELETE(

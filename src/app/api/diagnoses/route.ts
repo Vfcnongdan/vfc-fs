@@ -1,4 +1,4 @@
-import { NextRequest, after } from "next/server";
+import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getRequestUser, apiError, apiOk } from "@/lib/request";
 import { DiagnosisStatus } from "@prisma/client";
@@ -14,8 +14,6 @@ export async function POST(request: NextRequest) {
   if (!formData) return apiError("INVALID_FORM_DATA", 400);
 
   const cropType = formData.get("cropType") as string | null;
-  const imageUrls: string[] = [];
-
   // Handle file uploads (placeholder — real impl: upload to GCS/S3)
   const files = formData.getAll("images") as File[];
   if (!files.length) return apiError("NO_IMAGES", 400);
@@ -24,7 +22,7 @@ export async function POST(request: NextRequest) {
   const sharp = (await import("sharp")).default;
 
   for (const file of files) {
-    let buffer: any = Buffer.from(await file.arrayBuffer());
+    let buffer: Buffer | null = Buffer.from(await file.arrayBuffer());
 
     // Optimize image: resize to max 256px and compress aggressively
     const optimizedBuffer = await sharp(buffer)
@@ -77,7 +75,7 @@ export async function GET(request: NextRequest) {
       include: {
         suggestions: {
           include: {
-            product: { select: { name: true, imageUrls: true, slug: true, price: true } },
+            product: { select: { id: true, name: true, imageUrls: true, slug: true, price: true } },
           },
           orderBy: { rank: "asc" },
         },
@@ -92,6 +90,174 @@ export async function GET(request: NextRequest) {
 }
 
 // ─── AI Runner ────────────────────────────────────────────────────────────────
+
+type AiProvider = "gemini" | "groq";
+
+type AiDiagnosisResponse = {
+  disease?: string;
+  severity?: string;
+  summary?: string;
+  confidence?: number;
+  suggestedProductIds?: string[];
+  reasons?: Record<string, string>;
+  aiProvider?: AiProvider;
+  fallbackFrom?: AiProvider;
+};
+
+type ProductContextItem = {
+  id: string;
+  name: string;
+  targets: string;
+};
+
+type GeminiContentPart =
+  | { text: string }
+  | { inlineData: { data: string; mimeType: "image/jpeg" } };
+
+function buildDiagnosisPrompt(
+  productContext: ProductContextItem[],
+  cropType?: string,
+) {
+  return `Bạn là chuyên gia nông nghiệp của VFC. Hãy phân tích hình ảnh cây trồng${cropType ? ` (loại: ${cropType})` : ""} và:
+1. Xác định bệnh/vấn đề (nếu có). Cung cấp thông tin chi tiết tên bệnh.
+2. Đánh giá mức độ bệnh theo thang của riêng bệnh đó (nếu có), hoặc đánh giá mức độ chung chung (nhẹ/trung bình/nặng).
+3. Đề xuất hướng xử lý.
+4. CHỌN ra tối đa 3 sản phẩm PHÙ HỢP NHẤT từ danh sách dưới đây dựa trên công dụng của chúng:
+${JSON.stringify(productContext)}
+
+Đối với mỗi sản phẩm đề nghị, phải ghi rõ CÔNG DỤNG RÕ RÀNG đối với tình trạng bệnh của cây đang hỏi trong phần "reasons".
+
+Trả về kết quả dưới dạng JSON thuần túy (không có markdown) với format: 
+{ 
+  "disease": "tên bệnh (kèm thông tin chi tiết)", 
+  "severity": "mức độ bệnh (theo thang riêng của bệnh hoặc nhẹ/trung bình/nặng)", 
+  "summary": "tóm tắt ngắn gọn hướng xử lý", 
+  "confidence": 0-1,
+  "suggestedProductIds": ["id_san_pham_1", "id_san_pham_2"],
+  "reasons": { "id_san_pham_1": "công dụng rõ ràng của sản phẩm đối với tình trạng cây đang hỏi" }
+}`;
+}
+
+function parseAiJson(text: string, provider: AiProvider): AiDiagnosisResponse {
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    console.error(`[AI Diagnosis Parse Error] No JSON block found in ${provider} response. Raw text:`, text);
+    throw new Error(`${provider} failed to return valid JSON`);
+  }
+
+  return JSON.parse(jsonMatch[0]);
+}
+
+async function analyzeWithGemini(
+  prompt: string,
+  base64Images: string[],
+): Promise<AiDiagnosisResponse> {
+  const hasApiKey = !!process.env.GEMINI_API_KEY;
+  console.log(`[AI Diagnosis Gemini API Key Check] Key exists: ${hasApiKey}`);
+  if (!hasApiKey) {
+    throw new Error("GEMINI_API_KEY is not defined in environment variables");
+  }
+
+  const { GoogleGenerativeAI } = await import("@google/generative-ai");
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+  const model = genAI.getGenerativeModel({
+    model: process.env.GEMINI_MODEL || "gemini-flash-latest",
+  });
+
+  const parts: GeminiContentPart[] = [{ text: prompt }];
+
+  for (let idx = 0; idx < base64Images.length; idx++) {
+    const base64Data = base64Images[idx];
+    console.log(`[AI Diagnosis Gemini Payload] Image ${idx} size: ${(base64Data.length * 0.75 / 1024).toFixed(2)} KB`);
+    parts.push({
+      inlineData: {
+        data: base64Data,
+        mimeType: "image/jpeg",
+      },
+    });
+  }
+
+  console.log("[AI Diagnosis API Call] Sending request to Gemini API...");
+  const result = await model.generateContent(parts);
+  const text = result.response.text();
+  console.log(`[AI Diagnosis Gemini Response] Received response. Text length: ${text.length}`);
+  parts.length = 0;
+
+  return parseAiJson(text, "gemini");
+}
+
+async function analyzeWithGroq(
+  prompt: string,
+  base64Images: string[],
+): Promise<AiDiagnosisResponse> {
+  const hasApiKey = !!process.env.GROQ_API_KEY;
+  console.log(`[AI Diagnosis Groq API Key Check] Key exists: ${hasApiKey}`);
+  if (!hasApiKey) {
+    throw new Error("GROQ_API_KEY is not defined in environment variables");
+  }
+
+  const content: Array<
+    | { type: "text"; text: string }
+    | { type: "image_url"; image_url: { url: string } }
+  > = [{ type: "text", text: prompt }];
+
+  for (let idx = 0; idx < base64Images.length; idx++) {
+    const base64Data = base64Images[idx];
+    console.log(`[AI Diagnosis Groq Payload] Image ${idx} size: ${(base64Data.length * 0.75 / 1024).toFixed(2)} KB`);
+    content.push({
+      type: "image_url",
+      image_url: {
+        url: `data:image/jpeg;base64,${base64Data}`,
+      },
+    });
+  }
+
+  console.log("[AI Diagnosis API Call] Sending request to Groq API...");
+  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: process.env.GROQ_VISION_MODEL || "meta-llama/llama-4-scout-17b-16e-instruct",
+      messages: [{ role: "user", content }],
+      temperature: 0.2,
+      max_completion_tokens: 1024,
+      response_format: { type: "json_object" },
+      stream: false,
+    }),
+  });
+
+  const responseText = await res.text();
+  const data = JSON.parse(responseText || "{}");
+  if (!res.ok) {
+    throw new Error(`Groq API failed with ${res.status}: ${JSON.stringify(data)}`);
+  }
+
+  const text = data?.choices?.[0]?.message?.content;
+  if (typeof text !== "string" || text.length === 0) {
+    throw new Error("Groq API returned an empty response");
+  }
+
+  console.log(`[AI Diagnosis Groq Response] Received response. Text length: ${text.length}`);
+  return parseAiJson(text, "groq");
+}
+
+async function analyzeWithFallback(
+  prompt: string,
+  base64Images: string[],
+): Promise<AiDiagnosisResponse> {
+  try {
+    const parsed = await analyzeWithGemini(prompt, base64Images);
+    return { ...parsed, aiProvider: "gemini" };
+  } catch (geminiError) {
+    console.error("[AI Diagnosis Gemini Error] Falling back to Groq", geminiError);
+  }
+
+  const parsed = await analyzeWithGroq(prompt, base64Images);
+  return { ...parsed, aiProvider: "groq", fallbackFrom: "gemini" };
+}
 
 async function runAiDiagnosis(
   diagnosisId: string,
@@ -114,66 +280,10 @@ async function runAiDiagnosis(
 
   console.log(`[AI Diagnosis Context] Products count: ${productContext.length}`);
 
-  const hasApiKey = !!process.env.GEMINI_API_KEY;
-  console.log(`[AI Diagnosis API Key Check] Key exists: ${hasApiKey}`);
-  if (!hasApiKey) {
-    throw new Error("GEMINI_API_KEY is not defined in environment variables");
-  }
-
-  const { GoogleGenerativeAI } = await import("@google/generative-ai");
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-  const model = genAI.getGenerativeModel({
-    model: "gemini-flash-latest",
-  });
-
-  const prompt = `Bạn là chuyên gia nông nghiệp của VFC. Hãy phân tích hình ảnh cây trồng${cropType ? ` (loại: ${cropType})` : ""} và:
-1. Xác định bệnh/vấn đề (nếu có). Cung cấp thông tin chi tiết tên bệnh.
-2. Đánh giá mức độ bệnh theo thang của riêng bệnh đó (nếu có), hoặc đánh giá mức độ chung chung (nhẹ/trung bình/nặng).
-3. Đề xuất hướng xử lý.
-4. CHỌN ra tối đa 3 sản phẩm PHÙ HỢP NHẤT từ danh sách dưới đây dựa trên công dụng của chúng:
-${JSON.stringify(productContext)}
-
-Đối với mỗi sản phẩm đề nghị, phải ghi rõ CÔNG DỤNG RÕ RÀNG đối với tình trạng bệnh của cây đang hỏi trong phần "reasons".
-
-Trả về kết quả dưới dạng JSON thuần túy (không có markdown) với format: 
-{ 
-  "disease": "tên bệnh (kèm thông tin chi tiết)", 
-  "severity": "mức độ bệnh (theo thang riêng của bệnh hoặc nhẹ/trung bình/nặng)", 
-  "summary": "tóm tắt ngắn gọn hướng xử lý", 
-  "confidence": 0-1,
-  "suggestedProductIds": ["id_san_pham_1", "id_san_pham_2"],
-  "reasons": { "id_san_pham_1": "công dụng rõ ràng của sản phẩm đối với tình trạng cây đang hỏi" }
-}`;
+  const prompt = buildDiagnosisPrompt(productContext, cropType);
 
   try {
-    const parts: any[] = [{ text: prompt }];
-
-    for (let idx = 0; idx < base64Images.length; idx++) {
-      const base64Data = base64Images[idx];
-      console.log(`[AI Diagnosis Payload] Image ${idx} size: ${(base64Data.length * 0.75 / 1024).toFixed(2)} KB`);
-      parts.push({
-        inlineData: {
-          data: base64Data,
-          mimeType: "image/jpeg",
-        },
-      });
-    }
-
-    console.log(`[AI Diagnosis API Call] Sending request to Gemini API...`);
-    const result = await model.generateContent(parts);
-    const text = result.response.text();
-    console.log(`[AI Diagnosis API Response] Received response. Text length: ${text.length}`);
-
-    // Clear parts array memory
-    parts.length = 0;
-
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      console.error(`[AI Diagnosis Parse Error] No JSON block found in raw response. Raw text:`, text);
-    }
-    const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
-
-    if (!parsed) throw new Error("AI failed to return valid JSON");
+    const parsed = await analyzeWithFallback(prompt, base64Images);
 
     const suggestedProductIds: string[] = parsed.suggestedProductIds ?? [];
     

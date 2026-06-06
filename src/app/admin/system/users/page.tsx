@@ -11,6 +11,11 @@ interface User {
   role: Role;
   isActive: boolean;
   createdAt: string;
+  profile?: {
+    address: string | null;
+    notes: string | null;
+    cropIds: string[];
+  } | null;
 }
 
 export default function UserManagementPage() {
@@ -24,6 +29,14 @@ export default function UserManagementPage() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+
+  const [isProfileSectionOpen, setIsProfileSectionOpen] =
+    useState(false);
+  const [profileAddress, setProfileAddress] = useState("");
+  const [profileNotes, setProfileNotes] = useState("");
+  const [allCrops, setAllCrops] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectedCropIds, setSelectedCropIds] = useState<string[]>([]);
+  const [loadingCropsForProfile, setLoadingCropsForProfile] = useState(false);
 
   // Debounce search
   useEffect(() => {
@@ -56,6 +69,29 @@ export default function UserManagementPage() {
   useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
+
+  useEffect(() => {
+    if (!isEditModalOpen || !selectedUser) return;
+
+    setIsProfileSectionOpen(false); // collapsed by default
+    setProfileAddress(selectedUser.profile?.address ?? "");
+    setProfileNotes(selectedUser.profile?.notes ?? "");
+    setSelectedCropIds(selectedUser.profile?.cropIds ?? []);
+
+    setLoadingCropsForProfile(true);
+    fetch("/api/crops")
+      .then((res) => res.json())
+      .then((data) => {
+        setAllCrops(
+          (data ?? []).map((c: any) => ({ id: c.id as string, name: c.name as string })),
+        );
+      })
+      .catch((err) => {
+        console.error("Failed to load crops for profile:", err);
+        setAllCrops([]);
+      })
+      .finally(() => setLoadingCropsForProfile(false));
+  }, [isEditModalOpen, selectedUser?.id]);
 
   const handleToggleActive = async (user: User) => {
     try {
@@ -103,6 +139,12 @@ export default function UserManagementPage() {
     const isEdit = !!selectedUser;
     if (!isEdit) {
       data.phone = formData.get("phone") as string;
+    }
+
+    if (isEdit && isProfileSectionOpen) {
+      data.address = profileAddress.trim().length > 0 ? profileAddress.trim() : null;
+      data.notes = profileNotes.trim().length > 0 ? profileNotes.trim() : null;
+      data.cropIds = selectedCropIds;
     }
 
     try {
@@ -252,8 +294,10 @@ export default function UserManagementPage() {
                                 ? "bg-blue-100 text-blue-700"
                                 : user.role === "AGENCY"
                                   ? "bg-amber-100 text-amber-700"
-                                  : user.role === "MDO"
-                                    ? "bg-indigo-100 text-indigo-700"
+                                  : user.role === "SUPER_AGENT"
+                                    ? "bg-cyan-100 text-cyan-700"
+                                    : user.role === "MDO"
+                                      ? "bg-indigo-100 text-indigo-700"
                                     : user.role === "SE"
                                       ? "bg-rose-100 text-rose-700"
                                       : user.role === "BGD"
@@ -401,13 +445,102 @@ export default function UserManagementPage() {
                   <option value="FARMER">FARMER</option>
                   <option value="SALE">SALE (Nhân viên kinh doanh)</option>
                   <option value="AGENCY">AGENCY (Đại lý)</option>
-
+                  <option value="SUPER_AGENT">SUPER_AGENT (Tổng đại lý)</option>
                   <option value="MDO">MDO (Quảng bá sản phẩm)</option>
                   <option value="SE">SE (Kỹ sư khu vực)</option>
                   <option value="BGD">BGD (Ban giám đốc)</option>
                   <option value="ADMIN">ADMIN (Quản trị viên)</option>
                 </select>
               </div>
+
+              {selectedUser && (
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsProfileSectionOpen((v) => !v)}
+                    className="w-full text-left px-3 py-2 rounded-xl border border-neutral-200 bg-neutral-50 hover:bg-neutral-100 text-sm font-bold text-neutral-700"
+                  >
+                    {isProfileSectionOpen
+                      ? "▾ Ẩn thông tin Profile"
+                      : "▸ Hiển thị thông tin Profile"}
+                  </button>
+
+                  {isProfileSectionOpen && (
+                    <div className="mt-3 space-y-3">
+                      <div>
+                        <label className="block text-xs font-bold text-neutral-500 uppercase mb-1">
+                          Địa chỉ
+                        </label>
+                        <input
+                          value={profileAddress}
+                          onChange={(e) => setProfileAddress(e.target.value)}
+                          placeholder="Địa chỉ của người dùng"
+                          className="w-full px-4 py-2 rounded-xl border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-neutral-500 uppercase mb-1">
+                          Ghi chú
+                        </label>
+                        <textarea
+                          value={profileNotes}
+                          onChange={(e) => setProfileNotes(e.target.value)}
+                          placeholder="Ghi chú (tuỳ chọn)"
+                          rows={3}
+                          className="w-full px-4 py-2 rounded-xl border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-neutral-500 uppercase mb-1">
+                          Cây trồng của tôi
+                        </label>
+                        {loadingCropsForProfile ? (
+                          <p className="text-xs text-neutral-500 italic">
+                            Đang tải danh sách cây trồng...
+                          </p>
+                        ) : allCrops.length === 0 ? (
+                          <p className="text-xs text-neutral-500 italic">
+                            Không có cây trồng nào.
+                          </p>
+                        ) : (
+                          <div className="max-h-36 overflow-y-auto rounded-xl border border-neutral-200 bg-white/60 p-2">
+                            <div className="grid grid-cols-1 gap-2">
+                              {allCrops.map((c) => {
+                                const checked =
+                                  selectedCropIds.includes(c.id);
+                                return (
+                                  <label
+                                    key={c.id}
+                                    className="flex items-center gap-3 text-sm cursor-pointer select-none"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={checked}
+                                      onChange={() =>
+                                        setSelectedCropIds((prev) =>
+                                          prev.includes(c.id)
+                                            ? prev.filter((x) => x !== c.id)
+                                            : [...prev, c.id],
+                                        )
+                                      }
+                                    />
+                                    <span className="text-neutral-700">
+                                      {c.name}
+                                    </span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="pt-4 flex gap-3">
                 <button
                   type="button"
@@ -454,6 +587,8 @@ export default function UserManagementPage() {
                         ? "💼"
                         : selectedUser.role === "AGENCY"
                           ? "🏪"
+                          : selectedUser.role === "SUPER_AGENT"
+                            ? "🚀"
                           : selectedUser.role === "MDO"
                             ? "📢"
                             : selectedUser.role === "SE"

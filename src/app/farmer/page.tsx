@@ -55,7 +55,7 @@ export default function FarmerHomePage() {
 
       {/* My Crops Section */}
       <div className="card bg-[#0C4A3F] border border-white/10 text-white p-4 rounded-2xl shadow-md">
-        <h3 className="text-lg font-bold">Các cây trồng của tôi</h3>
+        <h3 className="text-lg font-bold">Cây trồng của tôi</h3>
         <p className="text-xs text-white/70 mt-1 mb-4">
           Thêm các loại cây trồng để nhận biết thông tin liên quan mới nhất
         </p>

@@ -2,12 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { verifyOtp } from "@/lib/otp";
 import { signToken, COOKIE_NAME, COOKIE_OPTIONS } from "@/lib/auth";
+import { linkAgencyIfMissing, resolveAgencyUser } from "@/lib/agencyAuth";
+import { linkFarmerIfMissing, resolveFarmerUser } from "@/lib/farmerAuth";
+import { getPhoneVariants, isValidVietnamesePhone } from "@/lib/phone";
 import { prisma } from "@/lib/prisma";
-import { cookies } from "next/headers";
+import { ensureUserProfile } from "@/lib/userProfile";
 import crypto from "crypto";
 
 const schema = z.object({
-  phone: z.string().regex(/^(0|\+84)[3-9]\d{8}$/),
+  phone: z.string().refine(isValidVietnamesePhone),
   otp: z.string().length(4),
 });
 
@@ -29,12 +32,30 @@ export async function POST(request: NextRequest) {
 
     const sessionToken = crypto.randomUUID();
 
-    // Upsert user
-    const user = await prisma.user.upsert({
-      where: { phone },
-      create: { phone, sessionToken },
-      update: { lastLoginAt: new Date(), sessionToken },
+    const phoneVariants = getPhoneVariants(phone);
+
+    let user = await prisma.user.findFirst({
+      where: { phone: { in: phoneVariants } },
     });
+
+    if (user) {
+      await linkAgencyIfMissing(user, phoneVariants);
+      await linkFarmerIfMissing(user, phoneVariants);
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: { lastLoginAt: new Date(), sessionToken },
+      });
+    } else {
+      user = await resolveAgencyUser(phoneVariants, phone, sessionToken);
+      if (!user) {
+        user = await resolveFarmerUser(phoneVariants, phone, sessionToken);
+      }
+      if (!user) {
+        return Response.json({ error: "PHONE_NOT_AUTHORIZED" }, { status: 403 });
+      }
+    }
+
+    await ensureUserProfile(user.id);
 
     const token = await signToken({ sub: user.id, phone: user.phone, role: user.role, sessionId: sessionToken });
 

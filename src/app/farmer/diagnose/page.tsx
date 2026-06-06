@@ -1,7 +1,26 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  mergeSelections,
+  ProductMultiSelect,
+  selectionTotal,
+  type MultiSelectProduct,
+} from "@/components/ProductMultiSelect";
 import { useCropStore } from "@/store/useCropStore";
+
+type AgencyCatalog = {
+  suggested: MultiSelectProduct[];
+  additional: MultiSelectProduct[];
+};
+
+type AgencyListItem = {
+  id: string;
+  name: string;
+  phone?: string | null;
+  address?: string | null;
+  distance: number;
+};
 
 type DiagnosisResult = {
   id: string;
@@ -16,6 +35,7 @@ type DiagnosisResult = {
     rank: number;
     reason: string;
     product?: {
+      id: string;
       name: string;
       imageUrls: string[];
       slug: string;
@@ -33,19 +53,52 @@ export default function DiagnosePage() {
   const [result, setResult] = useState<DiagnosisResult | null>(null);
   const [error, setError] = useState("");
   const [blockedTimeRemaining, setBlockedTimeRemaining] = useState<number>(0);
-  const [agencies, setAgencies] = useState<any[]>([]);
+  const [agencies, setAgencies] = useState<AgencyListItem[]>([]);
   const [loadingAgencies, setLoadingAgencies] = useState(false);
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
-  const [selectedAgency, setSelectedAgency] = useState<any>(null);
-  const [selectedProduct, setSelectedProduct] = useState<any>(null);
+  const [selectedAgency, setSelectedAgency] = useState<AgencyListItem | null>(null);
+  const [catalog, setCatalog] = useState<AgencyCatalog | null>(null);
+  const [loadingCatalog, setLoadingCatalog] = useState(false);
+  const [selectedSuggested, setSelectedSuggested] = useState<Map<string, number>>(new Map());
+  const [selectedAdditional, setSelectedAdditional] = useState<Map<string, number>>(new Map());
   const [farmArea, setFarmArea] = useState<string>("1.0");
+  const [orderSubmitting, setOrderSubmitting] = useState(false);
+  const [orderError, setOrderError] = useState("");
+  const preselectProductIdRef = useRef<string | null>(null);
 
-  const fetchFallbackAgencies = async () => {
+  const suggestionProductIds = useMemo(
+    () =>
+      result?.suggestions
+        ?.map((s) => s.product?.id)
+        .filter((id): id is string => Boolean(id)) ?? [],
+    [result?.suggestions],
+  );
+
+  const defaultLineQty = Math.max(1, Math.ceil(parseFloat(farmArea) || 1));
+
+  const orderTotal = useMemo(() => {
+    if (!catalog) return 0;
+    return (
+      selectionTotal(catalog.suggested, selectedSuggested) +
+      selectionTotal(catalog.additional, selectedAdditional)
+    );
+  }, [catalog, selectedSuggested, selectedAdditional]);
+
+  const buildAgencyQuery = useCallback(
+    (lat: number, lon: number) => {
+      const base = `latitude=${lat}&longitude=${lon}`;
+      if (suggestionProductIds.length === 0) return base;
+      return `${base}&suggestionProductIds=${suggestionProductIds.join(",")}`;
+    },
+    [suggestionProductIds],
+  );
+
+  const fetchFallbackAgencies = useCallback(async () => {
     // Tọa độ mặc định ở An Giang
     const defaultLat = 10.8403;
     const defaultLon = 105.1800;
     try {
-      const res = await fetch(`/api/farmer/agencies?latitude=${defaultLat}&longitude=${defaultLon}`);
+      const res = await fetch(`/api/farmer/agencies?${buildAgencyQuery(defaultLat, defaultLon)}`);
       const data = await res.json();
       if (res.ok) {
         setAgencies(data);
@@ -55,30 +108,30 @@ export default function DiagnosePage() {
     } finally {
       setLoadingAgencies(false);
     }
-  };
+  }, [buildAgencyQuery]);
 
-  const fetchAgencies = () => {
+  const fetchAgencies = useCallback(() => {
     setLoadingAgencies(true);
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         async (position) => {
           const { latitude, longitude } = position.coords;
           try {
-            const res = await fetch(`/api/farmer/agencies?latitude=${latitude}&longitude=${longitude}`);
+            const res = await fetch(`/api/farmer/agencies?${buildAgencyQuery(latitude, longitude)}`);
             const data = await res.json();
             if (res.ok) {
               setAgencies(data);
             } else {
               await fetchFallbackAgencies();
             }
-          } catch (e) {
+          } catch {
             await fetchFallbackAgencies();
           } finally {
             setLoadingAgencies(false);
           }
         },
-        async (error) => {
-          console.warn("Geolocation error, using fallback:", error);
+        async () => {
+          console.warn("Geolocation error, using fallback");
           await fetchFallbackAgencies();
         },
         {
@@ -90,21 +143,124 @@ export default function DiagnosePage() {
     } else {
       fetchFallbackAgencies();
     }
-  };
+  }, [buildAgencyQuery, fetchFallbackAgencies]);
 
   useEffect(() => {
-    if (result && result.status === "DONE") {
-      fetchAgencies();
+    if (result?.status === "DONE") {
+      queueMicrotask(fetchAgencies);
     }
-  }, [result]);
+  }, [fetchAgencies, result?.status]);
 
-  const handleOpenOrderModal = (agency: any) => {
-    setSelectedAgency(agency);
-    const productSuggestions = result?.suggestions || [];
-    const firstSuggested = productSuggestions[0]?.product;
-    setSelectedProduct(firstSuggested || null);
+  const loadAgencyCatalog = useCallback(
+    async (agencyId: string) => {
+      setLoadingCatalog(true);
+      setOrderError("");
+      try {
+        const qs =
+          suggestionProductIds.length > 0
+            ? `?suggestionProductIds=${suggestionProductIds.join(",")}`
+            : "";
+        const res = await fetch(`/api/farmer/agencies/${agencyId}/catalog${qs}`);
+        const data: AgencyCatalog = await res.json();
+        if (!res.ok) {
+          setCatalog(null);
+          setSelectedSuggested(new Map());
+          setSelectedAdditional(new Map());
+          return;
+        }
+        setCatalog(data);
+
+        const preselectId = preselectProductIdRef.current;
+        const suggestedMap = new Map<string, number>();
+        if (preselectId) {
+          const item = data.suggested.find((p) => p.productId === preselectId);
+          if (item) {
+            suggestedMap.set(preselectId, Math.min(defaultLineQty, item.stock));
+          }
+        } else {
+          for (const item of data.suggested) {
+            suggestedMap.set(item.productId, Math.min(defaultLineQty, item.stock));
+          }
+        }
+        setSelectedSuggested(suggestedMap);
+        setSelectedAdditional(new Map());
+        preselectProductIdRef.current = null;
+      } catch {
+        setCatalog(null);
+      } finally {
+        setLoadingCatalog(false);
+      }
+    },
+    [suggestionProductIds, defaultLineQty],
+  );
+
+  useEffect(() => {
+    if (isOrderModalOpen && selectedAgency?.id) {
+      queueMicrotask(() => loadAgencyCatalog(selectedAgency.id));
+    }
+  }, [isOrderModalOpen, selectedAgency?.id, loadAgencyCatalog]);
+
+  const handleOpenOrderModal = (agency?: AgencyListItem) => {
+    if (agencies.length === 0) return;
+    setOrderError("");
     setFarmArea("1.0");
+    preselectProductIdRef.current = null;
+    setSelectedAgency(agency ?? agencies[0]);
     setIsOrderModalOpen(true);
+  };
+
+  const handleOpenOrderModalFromProduct = (product: { id: string }) => {
+    if (agencies.length === 0) return;
+    preselectProductIdRef.current = product.id;
+    setOrderError("");
+    setFarmArea("1.0");
+    setSelectedAgency(agencies[0]);
+    setIsOrderModalOpen(true);
+  };
+
+  const handleConfirmOrder = async () => {
+    if (!selectedAgency?.id || !catalog) {
+      setOrderError("Vui lòng chọn đại lý");
+      return;
+    }
+    const items = mergeSelections(
+      catalog.suggested,
+      catalog.additional,
+      selectedSuggested,
+      selectedAdditional,
+    );
+    if (items.length === 0) {
+      setOrderError("Vui lòng chọn ít nhất một sản phẩm");
+      return;
+    }
+    setOrderError("");
+    setOrderSubmitting(true);
+    try {
+      const res = await fetch("/api/b2c/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          agencyId: selectedAgency.id,
+          items,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const msg =
+          data.error === "INSUFFICIENT_STOCK"
+            ? "Đại lý không đủ tồn kho sản phẩm này"
+            : data.error === "AGENCY_NOT_LINKED_TO_USER"
+              ? "Đại lý chưa được kích hoạt tài khoản. Vui lòng liên hệ hỗ trợ."
+              : data.error ?? "Đặt hàng thất bại";
+        throw new Error(msg);
+      }
+      setIsOrderModalOpen(false);
+      alert(`Đặt hàng thành công! Mã đơn #${String(data.orderNumber).slice(-8).toUpperCase()}`);
+    } catch (e: unknown) {
+      setOrderError(e instanceof Error ? e.message : "Có lỗi xảy ra");
+    } finally {
+      setOrderSubmitting(false);
+    }
   };
 
   useEffect(() => {
@@ -133,7 +289,7 @@ export default function DiagnosePage() {
           } else {
             setBlockedTimeRemaining(0);
           }
-        } catch (e) {
+        } catch {
           // ignore
         }
       }
@@ -161,7 +317,7 @@ export default function DiagnosePage() {
     }
 
     // Đọc thông tin rate limit từ localStorage
-    const now = Date.now();
+    const now = new Date().getTime();
     const today = new Date().toDateString();
     const dataStr = localStorage.getItem("vfc_diagnose_rate_limit");
     let limitData = { triggers: [] as number[], blockedUntil: 0, penaltyCount: 0, lastActiveDate: today };
@@ -175,7 +331,7 @@ export default function DiagnosePage() {
         } else {
           limitData = { ...parsed, lastActiveDate: today };
         }
-      } catch (e) {}
+      } catch {}
     } else {
       limitData.lastActiveDate = today;
     }
@@ -531,6 +687,18 @@ export default function DiagnosePage() {
                                 {s.reason}
                               </p>
                             </div>
+
+                            {s.product && !loadingAgencies && agencies.length > 0 && (
+                              <div className="flex justify-center sm:justify-start mt-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenOrderModalFromProduct(s.product!)}
+                                  className="flex items-center gap-2 py-2 px-5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-sm hover:shadow transition duration-200"
+                                >
+                                  🛒 Đặt hàng ngay
+                                </button>
+                              </div>
+                            )}
                           </div>
 
                           {/* Top Rank Badge */}
@@ -562,7 +730,9 @@ export default function DiagnosePage() {
                     <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
                   </div>
                 ) : agencies.length === 0 ? (
-                  <p className="text-neutral-500 text-sm text-center py-4">Không tìm thấy đại lý nào gần đây.</p>
+                  <p className="text-neutral-500 text-sm text-center py-4">
+                    Chưa tìm thấy đại lý bán hàng phù hợp.
+                  </p>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {agencies.map((agency) => (
@@ -601,117 +771,130 @@ export default function DiagnosePage() {
       )}
 
       {/* Order Modal */}
-      {isOrderModalOpen && selectedAgency && (
+      {isOrderModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/60 backdrop-blur-sm animate-fade-in p-4">
-          <div className="w-full max-w-md bg-white border border-neutral-100 rounded-3xl p-6 shadow-2xl animate-scale-in relative">
+          <div className="w-full max-w-md max-h-[90vh] overflow-y-auto bg-white border border-neutral-100 rounded-3xl p-6 shadow-2xl animate-scale-in relative">
             <button 
               onClick={() => setIsOrderModalOpen(false)}
               className="absolute top-4 right-4 text-neutral-400 hover:text-neutral-600 transition text-2xl font-bold"
             >
               &times;
             </button>
-
+ 
             <h3 className="text-xl font-black text-neutral-800 mb-4 flex items-center gap-2">
               🛒 Đặt hàng thuốc BVTV
             </h3>
-
+ 
             <div className="flex flex-col gap-4">
-              {/* Agency Name */}
               <div>
                 <label className="mb-1 block text-xs font-bold text-neutral-500 uppercase tracking-wider">
                   Đại lý tiếp nhận
                 </label>
-                <input 
-                  type="text" 
-                  value={selectedAgency.name} 
-                  readOnly 
-                  className="input-field bg-neutral-50 text-neutral-600 font-bold border-neutral-200 cursor-not-allowed"
-                />
+                {agencies.length === 0 ? (
+                  <div className="text-xs text-red-500 py-2">
+                    Không có đại lý nào còn đủ hàng cho sản phẩm đề xuất
+                  </div>
+                ) : (
+                  <select
+                    value={selectedAgency?.id || ""}
+                    onChange={(e) => {
+                      const agency = agencies.find((a) => a.id === e.target.value);
+                      setSelectedAgency(agency || null);
+                    }}
+                    className="input-field border-neutral-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 font-semibold"
+                  >
+                    {agencies.map((agency) => {
+                      const distStr =
+                        agency.distance > 1000
+                          ? `${(agency.distance / 1000).toFixed(1)} km`
+                          : `${Math.round(agency.distance)} m`;
+                      return (
+                        <option key={agency.id} value={agency.id}>
+                          {agency.name} ({distStr}) — {agency.address || "Không rõ địa chỉ"}
+                        </option>
+                      );
+                    })}
+                  </select>
+                )}
               </div>
 
-              {/* Product Select */}
               <div>
                 <label className="mb-1 block text-xs font-bold text-neutral-500 uppercase tracking-wider">
-                  Tên hàng (Sản phẩm đề xuất)
+                  Số lượng mặc định (mỗi SP mới chọn)
                 </label>
-                <select
-                  value={selectedProduct?.slug || ""}
-                  onChange={(e) => {
-                    const slug = e.target.value;
-                    const prod = result?.suggestions?.find(s => s.product?.slug === slug)?.product;
-                    setSelectedProduct(prod || null);
-                  }}
-                  className="input-field border-neutral-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                >
-                  {result?.suggestions?.map((s) => (
-                    <option key={s.product?.slug} value={s.product?.slug}>
-                      {s.product?.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Price */}
-              <div>
-                <label className="mb-1 block text-xs font-bold text-neutral-500 uppercase tracking-wider">
-                  Đơn giá
-                </label>
-                <input 
-                  type="text" 
-                  value={selectedProduct?.price 
-                    ? new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(selectedProduct.price)
-                    : "Liên hệ đại lý"
-                  } 
-                  readOnly 
-                  className="input-field bg-neutral-50 text-neutral-600 font-bold border-neutral-200 cursor-not-allowed"
-                />
-              </div>
-
-              {/* Area (ha) */}
-              <div>
-                <label className="mb-1 block text-xs font-bold text-neutral-500 uppercase tracking-wider">
-                  Diện tích (ha)
-                </label>
-                <input 
-                  type="number" 
-                  step="0.1" 
-                  min="0.01"
-                  value={farmArea} 
-                  onChange={(e) => setFarmArea(e.target.value)} 
+                <input
+                  type="number"
+                  step="1"
+                  min="1"
+                  value={farmArea}
+                  onChange={(e) => setFarmArea(e.target.value)}
                   className="input-field border-neutral-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 font-semibold"
-                  placeholder="Nhập diện tích canh tác"
                 />
               </div>
 
-              {/* Total Price */}
+              {loadingCatalog ? (
+                <div className="flex justify-center py-6">
+                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
+                </div>
+              ) : (
+                <>
+                  <ProductMultiSelect
+                    label="Sản phẩm đề xuất (còn hàng tại đại lý)"
+                    emptyText="Đại lý không còn hàng cho sản phẩm đề xuất"
+                    products={catalog?.suggested ?? []}
+                    selected={selectedSuggested}
+                    onChange={setSelectedSuggested}
+                    defaultQuantity={defaultLineQty}
+                  />
+
+                  <ProductMultiSelect
+                    label="Mua thêm từ kho đại lý"
+                    emptyText="Không có sản phẩm khác trong kho"
+                    products={catalog?.additional ?? []}
+                    selected={selectedAdditional}
+                    onChange={setSelectedAdditional}
+                    defaultQuantity={defaultLineQty}
+                  />
+                </>
+              )}
+
               <div className="mt-2 p-4 bg-blue-50/50 border border-blue-100 rounded-2xl">
                 <span className="block text-[10px] font-extrabold text-blue-600 uppercase tracking-widest">
                   Tổng cộng tạm tính
                 </span>
                 <span className="text-2xl font-black text-blue-700 mt-1 block">
-                  {selectedProduct?.price 
-                    ? new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" })
-                        .format((parseFloat(farmArea) || 0) * selectedProduct.price)
-                    : "Liên hệ đại lý"
-                  }
+                  {orderTotal > 0
+                    ? new Intl.NumberFormat("vi-VN", {
+                        style: "currency",
+                        currency: "VND",
+                      }).format(orderTotal)
+                    : "Chưa chọn sản phẩm"}
                 </span>
               </div>
+
+              {orderError && (
+                <p className="text-sm text-red-600 font-medium">{orderError}</p>
+              )}
 
               <div className="flex gap-3 mt-4">
                 <button 
                   onClick={() => setIsOrderModalOpen(false)}
-                  className="flex-1 py-2.5 border border-neutral-200 hover:bg-neutral-50 text-neutral-700 font-bold rounded-xl transition"
+                  disabled={orderSubmitting}
+                  className="flex-1 py-2.5 border border-neutral-200 hover:bg-neutral-50 text-neutral-700 font-bold rounded-xl transition disabled:opacity-50"
                 >
                   Hủy
                 </button>
                 <button 
-                  onClick={() => {
-                    alert("Đặt hàng thành công! (Logic chi tiết sẽ được phát triển sau)");
-                    setIsOrderModalOpen(false);
-                  }}
-                  className="flex-1 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold rounded-xl shadow-md transition"
+                  onClick={handleConfirmOrder}
+                  disabled={
+                    orderSubmitting ||
+                    !selectedAgency ||
+                    loadingCatalog ||
+                    (selectedSuggested.size === 0 && selectedAdditional.size === 0)
+                  }
+                  className="flex-1 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold rounded-xl shadow-md transition disabled:opacity-50"
                 >
-                  Xác nhận
+                  {orderSubmitting ? "Đang gửi..." : "Xác nhận"}
                 </button>
               </div>
             </div>

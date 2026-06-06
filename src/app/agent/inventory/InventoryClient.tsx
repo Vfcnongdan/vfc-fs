@@ -43,7 +43,7 @@ export default function InventoryClient({ products }: { products: any[] }) {
       const res = await fetch("/api/agent/inventory", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productDetailId: Number(selectedProduct), quantity: Number(quantity) }),
+        body: JSON.stringify({ productDetailId: selectedProduct, quantity: Number(quantity) }),
       });
       if (res.ok) {
         await fetchInventory();
@@ -159,8 +159,8 @@ export default function InventoryClient({ products }: { products: any[] }) {
                 >
                   <option value="" disabled>-- Chọn sản phẩm --</option>
                   {availableProducts.map((p) => (
-                    <option key={p.detail?.id} value={p.detail?.id}>
-                      {p.name} ({p.unit})
+                    <option key={p.id} value={p.detail?.id || ""} disabled={!p.detail?.id}>
+                      {p.name} ({p.unit}){!p.detail?.id ? " - Chưa cấu hình chi tiết" : ""}
                     </option>
                   ))}
                 </select>

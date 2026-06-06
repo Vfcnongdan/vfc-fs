@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import { getPhoneVariants } from "./phone";
 import { prisma } from "./prisma";
 
 const OTP_TTL_MINUTES = 5;
@@ -9,13 +10,14 @@ export function generateOtp(): string {
 }
 
 export async function createOtpRecord(phone: string): Promise<string> {
+  const variants = getPhoneVariants(phone);
   const otp = generateOtp();
   const hashed = await bcrypt.hash(otp, 10);
   const expiresAt = new Date(Date.now() + OTP_TTL_MINUTES * 60 * 1000);
 
-  // Invalidate old OTPs for this phone
+  // Invalidate old OTPs for this phone (any stored format)
   await prisma.otpRequest.updateMany({
-    where: { phone, verified: false },
+    where: { phone: { in: variants }, verified: false },
     data: { expiresAt: new Date(0) }, // expire immediately
   });
 
@@ -30,9 +32,10 @@ export async function verifyOtp(
   phone: string,
   plainOtp: string
 ): Promise<{ valid: boolean; reason?: string }> {
+  const variants = getPhoneVariants(phone);
   const record = await prisma.otpRequest.findFirst({
     where: {
-      phone,
+      phone: { in: variants },
       verified: false,
       expiresAt: { gt: new Date() },
     },

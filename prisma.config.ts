@@ -8,7 +8,8 @@ export default defineConfig({
     seed: "npx tsx prisma/seed.ts",
   },
   datasource: {
-    url: (process.env.DIRECT_URL || process.env.DATABASE_URL)!,
-    directUrl: process.env.DIRECT_URL!,
+    // Prefer DATABASE_URL (pgbouncer) because DIRECT_URL may be unreachable in dev.
+    url: (process.env.DATABASE_URL || process.env.DIRECT_URL)!,
+    directUrl: (process.env.DIRECT_URL || process.env.DATABASE_URL)!,
   } as any,
 });

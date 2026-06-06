@@ -342,6 +342,59 @@ async function main() {
       console.warn(`agencies.csv file not found at ${agenciesCsvPath}`);
     }
   }
+
+  // --- Seed Farmers (LOCAL ONLY) ---
+  if (!isLocal) {
+    console.log('⚠️  Skipping farmer seed: not local environment.');
+  } else {
+    const farmersCsvPath = path.join(process.cwd(), 'document', 'farmers1.csv');
+    if (fs.existsSync(farmersCsvPath)) {
+      const fileContent = fs.readFileSync(farmersCsvPath, 'utf-8');
+      const records = parse(fileContent, {
+        columns: true,
+        skip_empty_lines: true,
+        trim: true,
+        bom: true,
+      }) as any[];
+
+      console.log(`Found ${records.length} records in farmers1.csv`);
+
+      const CHUNK = 1000;
+      let inserted = 0;
+      for (let i = 0; i < records.length; i += CHUNK) {
+        const chunk = records.slice(i, i + CHUNK);
+        const data = chunk
+          .map((record: any) => {
+            const name = record['Name'];
+            const phone = record['Phone'];
+            if (!phone || !name) return null;
+            const areaStr = record['Area (ha)'];
+            return {
+              name,
+              phone,
+              ward: record['Ward'] || null,
+              province: record['Provind'] || null,
+              crop: record['Crop'] || null,
+              area: areaStr ? parseFloat(String(areaStr).replace(/,/g, '.')) || null : null,
+              agencyCode: record['Agency'] || null,
+              mdo: record['MDO'] || null,
+              se: record['SE'] || null,
+            };
+          })
+          .filter(Boolean) as any[];
+
+        const result = await prisma.farmer.createMany({
+          data,
+          skipDuplicates: true,
+        });
+        inserted += result.count;
+        process.stdout.write(`\r  Seeded ${i + chunk.length}/${records.length}...`);
+      }
+      console.log(`\nSuccessfully seeded ${inserted} farmers (skipped duplicates).`);
+    } else {
+      console.warn(`farmers1.csv file not found at ${farmersCsvPath}`);
+    }
+  }
 }
 
 main()

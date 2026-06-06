@@ -192,7 +192,7 @@ export default function HomePage() {
                   />
                 </div>
                 <p className="text-white/80 text-[11px] mt-2 italic text-center w-full">
-                  Ví dụ - 09X-xxx-xxxx
+                  Ví dụ: 09X-xxx-xxxx hoặc 9X-xxx-xxxx
                 </p>
               </div>
 

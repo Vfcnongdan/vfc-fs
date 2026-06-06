@@ -25,8 +25,9 @@ export async function GET(request: NextRequest) {
       skip,
       take,
       include: {
-        farmerProfile: true,
+        farmer: true,
         saleProfile: true,
+        profile: true,
       }
     })
   ]);
