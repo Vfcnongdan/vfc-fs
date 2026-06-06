@@ -101,35 +101,56 @@ export async function getAgencyOrderCatalog(
   });
   if (!agency?.userId) return null;
 
+  // Get all active products for suggested list
+  const allProducts = await prisma.product.findMany({
+    where: { isActive: true },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      price: true,
+      unit: true,
+    },
+  });
+
+  // Get agency inventory for stock info
   const inventories = await prisma.inventory.findMany({
-    where: { ownerId: agency.userId, quantity: { gt: 0 } },
-    include: {
+    where: { ownerId: agency.userId },
+    select: {
+      productDetailId: true,
+      quantity: true,
       productDetail: {
-        include: {
-          product: {
-            select: {
-              id: true,
-              name: true,
-              slug: true,
-              price: true,
-              unit: true,
-            },
-          },
-        },
+        select: { productId: true },
       },
     },
-    orderBy: { productDetail: { name: "asc" } },
   });
+
+  const stockMap = new Map<string, number>();
+  const productDetailIdMap = new Map<string, string>();
+  for (const inv of inventories) {
+    stockMap.set(inv.productDetail.productId, inv.quantity);
+    productDetailIdMap.set(inv.productDetail.productId, inv.productDetailId);
+  }
 
   const suggestionSet = new Set(suggestionProductIds);
   const suggested: OrderCatalogItem[] = [];
   const additional: OrderCatalogItem[] = [];
 
-  for (const inv of inventories) {
-    const item = mapInventoryToCatalogItem(inv);
-    if (suggestionSet.has(item.productId)) {
+  for (const product of allProducts) {
+    const productDetailId = productDetailIdMap.get(product.id) ?? "";
+    const item: OrderCatalogItem = {
+      productId: product.id,
+      productDetailId,
+      name: product.name,
+      slug: product.slug,
+      price: Number(product.price),
+      stock: stockMap.get(product.id) ?? 0,
+      unit: product.unit,
+    };
+
+    if (suggestionSet.has(product.id)) {
       suggested.push(item);
-    } else {
+    } else if (stockMap.has(product.id) && (stockMap.get(product.id) ?? 0) > 0) {
       additional.push(item);
     }
   }

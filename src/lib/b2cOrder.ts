@@ -89,11 +89,7 @@ export async function buildB2cLineItems(
       return { ok: false, error: "PRODUCT_NOT_FOUND_OR_INACTIVE", status: 400 };
     }
 
-    const stock = stockMap.get(line.productDetailId) ?? 0;
-    if (stock < line.quantity) {
-      return { ok: false, error: "INSUFFICIENT_STOCK", status: 400 };
-    }
-
+    // Stock check removed - allow orders regardless of inventory
     const unitPrice = detail.product.price;
     totalAmount += Number(unitPrice) * line.quantity;
     items.push({

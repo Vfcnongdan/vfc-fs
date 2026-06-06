@@ -14,7 +14,10 @@ export async function GET(_req: NextRequest) {
     return response;
   }
 
-  const user = await prisma.user.findUnique({ where: { id: session.sub } });
+  const user = await prisma.user.findUnique({
+    where: { id: session.sub },
+    include: { farmer: { select: { area: true } } },
+  });
 
   if (!user || user.sessionToken !== session.sessionId) {
     const response = NextResponse.json(
@@ -38,6 +41,7 @@ export async function GET(_req: NextRequest) {
       phone: user.phone,
       role: user.role,
       name: user.name,
+      area: user.farmer?.area,
     },
   });
 }

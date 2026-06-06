@@ -22,6 +22,14 @@ type AgencyListItem = {
   distance: number;
 };
 
+type UserProfile = {
+  id: string;
+  phone: string;
+  role: string;
+  name: string | null;
+  area?: number | null;
+};
+
 type DiagnosisResult = {
   id: string;
   status: "PROCESSING" | "DONE" | "FAILED";
@@ -57,6 +65,7 @@ export default function DiagnosePage() {
   const [loadingAgencies, setLoadingAgencies] = useState(false);
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
   const [selectedAgency, setSelectedAgency] = useState<AgencyListItem | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [catalog, setCatalog] = useState<AgencyCatalog | null>(null);
   const [loadingCatalog, setLoadingCatalog] = useState(false);
   const [selectedSuggested, setSelectedSuggested] = useState<Map<string, number>>(new Map());
@@ -172,18 +181,24 @@ export default function DiagnosePage() {
 
         const preselectId = preselectProductIdRef.current;
         const suggestedMap = new Map<string, number>();
+        const additionalMap = new Map<string, number>();
         if (preselectId) {
-          const item = data.suggested.find((p) => p.productId === preselectId);
-          if (item) {
-            suggestedMap.set(preselectId, Math.min(defaultLineQty, item.stock));
+          const sugItem = data.suggested.find((p) => p.productId === preselectId);
+          if (sugItem) {
+            suggestedMap.set(preselectId, defaultLineQty);
+          } else {
+            const addItem = data.additional.find((p) => p.productId === preselectId);
+            if (addItem) {
+              additionalMap.set(preselectId, defaultLineQty);
+            }
           }
         } else {
           for (const item of data.suggested) {
-            suggestedMap.set(item.productId, Math.min(defaultLineQty, item.stock));
+            suggestedMap.set(item.productId, defaultLineQty);
           }
         }
         setSelectedSuggested(suggestedMap);
-        setSelectedAdditional(new Map());
+        setSelectedAdditional(additionalMap);
         preselectProductIdRef.current = null;
       } catch {
         setCatalog(null);
@@ -195,6 +210,31 @@ export default function DiagnosePage() {
   );
 
   useEffect(() => {
+    setSelectedSuggested((prev) => {
+      const next = new Map(prev);
+      let changed = false;
+      for (const [key, val] of next) {
+        if (val !== defaultLineQty) {
+          next.set(key, defaultLineQty);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+    setSelectedAdditional((prev) => {
+      const next = new Map(prev);
+      let changed = false;
+      for (const [key, val] of next) {
+        if (val !== defaultLineQty) {
+          next.set(key, defaultLineQty);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [defaultLineQty]);
+
+  useEffect(() => {
     if (isOrderModalOpen && selectedAgency?.id) {
       queueMicrotask(() => loadAgencyCatalog(selectedAgency.id));
     }
@@ -203,7 +243,8 @@ export default function DiagnosePage() {
   const handleOpenOrderModal = (agency?: AgencyListItem) => {
     if (agencies.length === 0) return;
     setOrderError("");
-    setFarmArea("1.0");
+    const defaultArea = userProfile?.area && userProfile.area > 0 ? String(userProfile.area) : "1.0";
+    setFarmArea(defaultArea);
     preselectProductIdRef.current = null;
     setSelectedAgency(agency ?? agencies[0]);
     setIsOrderModalOpen(true);
@@ -213,7 +254,8 @@ export default function DiagnosePage() {
     if (agencies.length === 0) return;
     preselectProductIdRef.current = product.id;
     setOrderError("");
-    setFarmArea("1.0");
+    const defaultArea = userProfile?.area && userProfile.area > 0 ? String(userProfile.area) : "1.0";
+    setFarmArea(defaultArea);
     setSelectedAgency(agencies[0]);
     setIsOrderModalOpen(true);
   };
@@ -265,6 +307,12 @@ export default function DiagnosePage() {
 
   useEffect(() => {
     fetchUserCrops();
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.user) setUserProfile(d.user);
+      })
+      .catch(() => {});
   }, [fetchUserCrops]);
 
   // Kiểm tra trạng thái block từ localStorage mỗi giây
@@ -822,14 +870,17 @@ export default function DiagnosePage() {
                 <label className="mb-1 block text-xs font-bold text-neutral-500 uppercase tracking-wider">
                   Số lượng mặc định (mỗi SP mới chọn)
                 </label>
-                <input
-                  type="number"
-                  step="1"
-                  min="1"
-                  value={farmArea}
-                  onChange={(e) => setFarmArea(e.target.value)}
-                  className="input-field border-neutral-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 font-semibold"
-                />
+                <div className="relative">
+                  <input
+                    type="number"
+                    step="1"
+                    min="1"
+                    value={farmArea}
+                    onChange={(e) => setFarmArea(e.target.value)}
+                    className="input-field border-neutral-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 font-semibold"
+                  />
+                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-neutral-400">ha</span>
+                </div>
               </div>
 
               {loadingCatalog ? (
@@ -839,7 +890,7 @@ export default function DiagnosePage() {
               ) : (
                 <>
                   <ProductMultiSelect
-                    label="Sản phẩm đề xuất (còn hàng tại đại lý)"
+                    label="Sản phẩm đề xuất"
                     emptyText="Đại lý không còn hàng cho sản phẩm đề xuất"
                     products={catalog?.suggested ?? []}
                     selected={selectedSuggested}

@@ -33,6 +33,7 @@ model User {
   b2bSales     B2bOrder[]  @relation("B2bSeller")
   b2cPurchases B2cOrder[]  @relation("B2cBuyer")
   b2cSales     B2cOrder[]  @relation("B2cSeller")
+  notifications Notification[]
   agency       Agency?
   farmer       Farmer?
   profile      UserProfile?
@@ -266,11 +267,31 @@ model B2cOrder {
   buyer  User           @relation("B2cBuyer", fields: [buyerId], references: [id])
   seller User           @relation("B2cSeller", fields: [sellerId], references: [id])
   items  B2cOrderItem[]
+  notifications Notification[]
 
   @@index([buyerId, createdAt])
   @@index([sellerId, createdAt])
   @@index([status])
   @@map("b2c_orders")
+}
+
+model Notification {
+  id          String   @id @default(cuid())
+  recipientId String   @map("recipient_id")
+  orderId     String   @map("order_id")
+  type        String
+  title       String
+  message     String
+  isRead      Boolean  @default(false) @map("is_read")
+  createdAt   DateTime @default(now()) @map("created_at")
+  readAt      DateTime? @map("read_at")
+
+  recipient User     @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  order     B2cOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([recipientId, isRead, createdAt])
+  @@index([orderId])
+  @@map("notifications")
 }
 
 model B2cOrderItem {

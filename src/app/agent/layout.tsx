@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Package, FileText, User, ShieldCheck, Sprout } from "lucide-react";
+import { NotificationBell } from "@/components/NotificationBell";
 
 export default function AgentLayout({
   children,
@@ -64,6 +65,9 @@ export default function AgentLayout({
 
       {/* Main Content */}
       <main className="flex-1 w-full max-w-4xl mx-auto p-4 md:p-6 lg:p-8">
+        <div className="mb-3 flex justify-end">
+          <NotificationBell />
+        </div>
         {children}
       </main>
 

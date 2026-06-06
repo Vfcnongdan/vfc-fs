@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { LogoutButton } from "@/components/LogoutButton";
+import { NotificationBell } from "@/components/NotificationBell";
 
 const NON_FARMER_ROLES = ["ADMIN", "SALE", "AGENCY", "SUPER_AGENT", "MDO", "SE", "BGD"];
 
@@ -46,6 +47,7 @@ export function FarmerHeader() {
           </div>
 
           <div className="flex items-center gap-2 border-l border-white/20 pl-3">
+            <NotificationBell dark />
             {role && NON_FARMER_ROLES.includes(role) && (
               <Link
                 href="/admin"

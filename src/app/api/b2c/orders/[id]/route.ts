@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { b2cOrderDetailInclude } from "@/lib/b2cOrder";
+import { notifyOrderStatusChanged } from "@/lib/notifications";
 import { getRequestUser, apiError, apiOk } from "@/lib/request";
 import { Role, OrderStatus } from "@prisma/client";
 
@@ -53,7 +54,7 @@ export async function PATCH(
   const { id } = await params;
   const existing = await prisma.b2cOrder.findUnique({
     where: { id },
-    select: { buyerId: true, sellerId: true },
+    select: { buyerId: true, sellerId: true, status: true },
   });
   if (!existing) return apiError("NOT_FOUND", 404);
 
@@ -70,6 +71,10 @@ export async function PATCH(
     data: parsed.data,
     include: b2cOrderDetailInclude,
   });
+
+  if (parsed.data.status) {
+    await notifyOrderStatusChanged(updated, existing.status);
+  }
 
   return apiOk(updated);
 }

@@ -6,6 +6,7 @@ import {
   buildB2cLineItems,
   resolveSellerIdFromAgency,
 } from "@/lib/b2cOrder";
+import { notifyOrderCreated } from "@/lib/notifications";
 import { getRequestUser, apiError, apiOk } from "@/lib/request";
 import { Role } from "@prisma/client";
 
@@ -85,40 +86,19 @@ export async function POST(request: NextRequest) {
     return apiError(lineResult.error, lineResult.status);
   }
 
-  try {
-    const order = await prisma.$transaction(async (tx) => {
-      for (const item of lineResult.items) {
-        const updated = await tx.inventory.updateMany({
-          where: {
-            ownerId: sellerResult.sellerId,
-            productDetailId: item.productDetailId,
-            quantity: { gte: item.quantity },
-          },
-          data: { quantity: { decrement: item.quantity } },
-        });
-        if (updated.count === 0) {
-          throw new Error("INSUFFICIENT_STOCK");
-        }
-      }
+  const order = await prisma.b2cOrder.create({
+    data: {
+      buyerId: user.id,
+      sellerId: sellerResult.sellerId,
+      totalAmount: lineResult.totalAmount,
+      note,
+      deliveryAddr,
+      items: { create: lineResult.items },
+    },
+    include: b2cOrderListInclude,
+  });
 
-      return tx.b2cOrder.create({
-        data: {
-          buyerId: user.id,
-          sellerId: sellerResult.sellerId,
-          totalAmount: lineResult.totalAmount,
-          note,
-          deliveryAddr,
-          items: { create: lineResult.items },
-        },
-        include: b2cOrderListInclude,
-      });
-    });
+  await notifyOrderCreated(order);
 
-    return apiOk(order, 201);
-  } catch (err) {
-    if (err instanceof Error && err.message === "INSUFFICIENT_STOCK") {
-      return apiError("INSUFFICIENT_STOCK", 400);
-    }
-    throw err;
-  }
+  return apiOk(order, 201);
 }

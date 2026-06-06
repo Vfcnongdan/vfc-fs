@@ -25,18 +25,18 @@ export function ProductMultiSelect({
   onChange,
   defaultQuantity = 1,
 }: Props) {
-  const toggle = (productId: string, stock: number) => {
+  const toggle = (productId: string) => {
     const next = new Map(selected);
     if (next.has(productId)) {
       next.delete(productId);
     } else {
-      next.set(productId, Math.min(defaultQuantity, stock));
+      next.set(productId, defaultQuantity);
     }
     onChange(next);
   };
 
-  const setQty = (productId: string, stock: number, raw: string) => {
-    const qty = Math.max(1, Math.min(stock, parseInt(raw, 10) || 1));
+  const setQty = (productId: string, raw: string) => {
+    const qty = Math.max(1, parseInt(raw, 10) || 1);
     const next = new Map(selected);
     next.set(productId, qty);
     onChange(next);
@@ -70,14 +70,13 @@ export function ProductMultiSelect({
               <input
                 type="checkbox"
                 checked={checked}
-                onChange={() => toggle(p.productId, p.stock)}
+                onChange={() => toggle(p.productId)}
                 className="mt-1 rounded border-neutral-300 text-blue-600 focus:ring-blue-500"
               />
               <div className="flex justify-between flex-1 min-w-0">
                 <div>
                   <p className="text-sm font-semibold text-neutral-800 leading-tight">{p.name}</p>
                   <p className="text-[10px] text-neutral-500 mt-0.5">
-                    Còn {p.stock} {p.unit} ·{" "}
                     {new Intl.NumberFormat("vi-VN", {
                       style: "currency",
                       currency: "VND",
@@ -88,15 +87,17 @@ export function ProductMultiSelect({
                 {checked && (
                   <div className="flex items-center gap-2 mt-2">
                     <span className="text-[10px] font-bold text-neutral-500 uppercase">SL</span>
-                    <input
-                      type="number"
-                      min={1}
-                      max={p.stock}
-                      value={qty}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={(e) => setQty(p.productId, p.stock, e.target.value)}
-                      className="w-20 rounded-lg border border-neutral-200 px-2 py-1 text-sm font-semibold"
-                    />
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min={1}
+                        value={qty}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => setQty(p.productId, e.target.value)}
+                        className="w-24 rounded-lg border border-neutral-200 pl-2 pr-8 py-1 text-sm font-semibold"
+                      />
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-neutral-400">ha</span>
+                    </div>
                   </div>
                 )}
               </div>
