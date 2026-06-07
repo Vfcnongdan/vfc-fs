@@ -102,14 +102,6 @@ export async function PATCH(
         },
       });
 
-      if (validCropIds) {
-        await tx.userCrop.deleteMany({ where: { userId: id } });
-        if (validCropIds.length > 0) {
-          await tx.userCrop.createMany({
-            data: validCropIds.map((cropId: string) => ({ userId: id, cropId })),
-          });
-        }
-      }
     });
   }
 

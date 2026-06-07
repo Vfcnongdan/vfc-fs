@@ -22,7 +22,6 @@ model User {
   otpRequests   OtpRequest[]
   diagnoses     PlantDiagnosis[]
   saleProfile   SaleProfile?
-  crops         UserCrop[]
 
   parentId String? @map("parent_id")
   parent   User?   @relation("UserHierarchy", fields: [parentId], references: [id])
@@ -82,21 +81,8 @@ model Crop {
   createdAt   DateTime   @default(now()) @map("created_at")
   updatedAt   DateTime   @updatedAt @map("updated_at")
   sortOrder   Int        @default(999) @map("sort_order")
-  farmerCrops UserCrop[]
 
   @@map("crops")
-}
-
-model UserCrop {
-  id        String   @id @default(cuid())
-  userId    String   @map("user_id")
-  cropId    String   @map("crop_id")
-  createdAt DateTime @default(now()) @map("created_at")
-  crop      Crop     @relation(fields: [cropId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, cropId])
-  @@map("user_crops")
 }
 
 model OtpRequest {

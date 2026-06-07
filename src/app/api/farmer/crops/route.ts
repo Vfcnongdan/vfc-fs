@@ -23,7 +23,7 @@ export async function GET() {
       select: { cropIds: true },
     });
 
-    const userCropIds = profile?.cropIds ?? [];
+    const profileCropIds = profile?.cropIds ?? [];
 
     const allCrops = await prisma.crop.findMany({
       where: { isActive: true },
@@ -33,7 +33,7 @@ export async function GET() {
       ],
     });
 
-    const cropIdSet = new Set<string>(userCropIds);
+    const cropIdSet = new Set<string>(profileCropIds);
 
     if (user?.role === "FARMER" && user.farmer?.crop) {
       const farmerCropStr = user.farmer.crop;
@@ -90,35 +90,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "USER_NOT_FOUND" }, { status: 401 });
     }
 
-    // 2. Filter valid cropIds to prevent crop_id_fkey violations
+    // 2. Filter valid cropIds so only active catalog IDs are stored.
     const validCrops = await prisma.crop.findMany({
       where: { id: { in: cropIds } },
       select: { id: true }
     });
     const validCropIds = validCrops.map(c => c.id);
 
-    // Upsert profile cropIds + sync legacy user_crops join table.
-    await prisma.$transaction(async (tx) => {
-      await tx.userProfile.upsert({
-        where: { userId },
-        create: {
-          userId,
-          cropIds: validCropIds,
-          address: null,
-          notes: null,
-        },
-        update: {
-          cropIds: validCropIds,
-        },
-      });
-
-      // Replace all crops for this user (legacy)
-      await tx.userCrop.deleteMany({ where: { userId } });
-      if (validCropIds.length > 0) {
-        await tx.userCrop.createMany({
-          data: validCropIds.map((cropId) => ({ userId, cropId })),
-        });
-      }
+    await prisma.userProfile.upsert({
+      where: { userId },
+      create: {
+        userId,
+        cropIds: validCropIds,
+        address: null,
+        notes: null,
+      },
+      update: {
+        cropIds: validCropIds,
+      },
     });
 
     return NextResponse.json({ success: true });
