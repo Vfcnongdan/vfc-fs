@@ -28,6 +28,8 @@ type UserProfile = {
   role: string;
   name: string | null;
   area?: number | null;
+  ward?: string | null;
+  province?: string | null;
 };
 
 type DiagnosisResult = {
@@ -102,12 +104,20 @@ export default function DiagnosePage() {
     [suggestionProductIds],
   );
 
+  const buildWardQuery = useCallback(() => {
+    const ward = userProfile?.ward;
+    const parts: string[] = [];
+    if (ward) parts.push(`ward=${encodeURIComponent(ward)}`);
+    if (suggestionProductIds.length > 0)
+      parts.push(`suggestionProductIds=${suggestionProductIds.join(",")}`);
+    return parts.join("&");
+  }, [userProfile?.ward, suggestionProductIds]);
+
   const fetchFallbackAgencies = useCallback(async () => {
-    // Tọa độ mặc định ở An Giang
-    const defaultLat = 10.8403;
-    const defaultLon = 105.1800;
     try {
-      const res = await fetch(`/api/farmer/agencies?${buildAgencyQuery(defaultLat, defaultLon)}`);
+      // Dùng ward của user thay vì tọa độ cứng
+      const wardQuery = buildWardQuery();
+      const res = await fetch(`/api/farmer/agencies${wardQuery ? `?${wardQuery}` : ""}`);
       const data = await res.json();
       if (res.ok) {
         setAgencies(data);
@@ -117,7 +127,7 @@ export default function DiagnosePage() {
     } finally {
       setLoadingAgencies(false);
     }
-  }, [buildAgencyQuery]);
+  }, [buildWardQuery]);
 
   const fetchAgencies = useCallback(() => {
     setLoadingAgencies(true);
@@ -154,11 +164,13 @@ export default function DiagnosePage() {
     }
   }, [buildAgencyQuery, fetchFallbackAgencies]);
 
+  const canOrderRole = ["FARMER", "AGENCY", "SUPER_AGENT"].includes(userProfile?.role ?? "");
+
   useEffect(() => {
-    if (result?.status === "DONE") {
+    if (result?.status === "DONE" && canOrderRole) {
       queueMicrotask(fetchAgencies);
     }
-  }, [fetchAgencies, result?.status]);
+  }, [fetchAgencies, result?.status, canOrderRole]);
 
   const loadAgencyCatalog = useCallback(
     async (agencyId: string) => {
@@ -736,7 +748,7 @@ export default function DiagnosePage() {
                               </p>
                             </div>
 
-                            {s.product && !loadingAgencies && agencies.length > 0 && (
+                            {s.product && !loadingAgencies && agencies.length > 0 && canOrderRole && (
                               <div className="flex justify-center sm:justify-start mt-1">
                                 <button
                                   type="button"
@@ -762,14 +774,15 @@ export default function DiagnosePage() {
                 </div>
               )}
 
-              {/* Recommended Agencies Section */}
+              {/* Recommended Agencies Section — chỉ hiện cho FARMER/AGENCY/SUPER_AGENT */}
+              {canOrderRole && (
               <div className="card flex flex-col gap-4 mt-6">
                 <div className="flex items-center gap-2 mb-2">
                   <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-blue-600 text-base shadow-sm">
                     🏢
                   </span>
                   <h3 className="text-lg font-bold text-neutral-800">
-                    Đại lý VFC gần nhất hỗ trợ đặt hàng
+                    Đại lý VFC {userProfile?.ward ? `tại ${userProfile.ward}` : "gần nhất"} hỗ trợ đặt hàng
                   </h3>
                 </div>
 
@@ -813,6 +826,7 @@ export default function DiagnosePage() {
                   </div>
                 )}
               </div>
+              )}
             </>
           )}
         </div>

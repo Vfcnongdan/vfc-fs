@@ -16,7 +16,7 @@ export async function GET(_req: NextRequest) {
 
   const user = await prisma.user.findUnique({
     where: { id: session.sub },
-    include: { farmer: { select: { area: true } } },
+    include: { farmer: { select: { area: true, ward: true, province: true } } },
   });
 
   if (!user || user.sessionToken !== session.sessionId) {
@@ -42,6 +42,8 @@ export async function GET(_req: NextRequest) {
       role: user.role,
       name: user.name,
       area: user.farmer?.area,
+      ward: user.farmer?.ward ?? null,
+      province: user.farmer?.province ?? null,
     },
   });
 }

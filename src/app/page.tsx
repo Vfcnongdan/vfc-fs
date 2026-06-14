@@ -216,13 +216,13 @@ export default function HomePage() {
                   </div>
                   <span className="text-white text-[11px] leading-relaxed">
                     Bạn đã đồng ý với{" "}
-                    <span className="text-[#FFD680] font-bold underline underline-offset-2">
-                      Điều Khoản & Điều Kiện
-                    </span>{" "}
+                    <a href="/terms" target="_blank" className="text-[#FFD680] font-bold underline underline-offset-2">
+                      Điều Khoản &amp; Điều Kiện
+                    </a>{" "}
                     và{" "}
-                    <span className="text-[#FFD680] font-bold underline underline-offset-2">
+                    <a href="/privacy" target="_blank" className="text-[#FFD680] font-bold underline underline-offset-2">
                       Chính sách quyền riêng tư
-                    </span>
+                    </a>
                   </span>
                 </label>
               </div>

@@ -153,6 +153,22 @@ async function getFallbackSellingAgencies(coords?: { lat: number; lon: number })
   return anyAgencies.map((agency) => mapAgencyToDistance(agency, coords));
 }
 
+async function getAgenciesByWard(ward: string): Promise<AgencyWithDistance[]> {
+  const agencies = await prisma.agency.findMany({
+    where: {
+      userId: { not: null },
+      OR: [
+        { wardProvince: { contains: ward, mode: "insensitive" } },
+        { address: { contains: ward, mode: "insensitive" } },
+      ],
+    },
+    orderBy: { name: "asc" },
+    take: 5,
+  });
+  return agencies.map((a) => mapAgencyToDistance(a));
+}
+
+
 export async function GET(request: NextRequest) {
   const headerList = await headers();
   const userId = headerList.get("x-user-id");
@@ -174,6 +190,8 @@ export async function GET(request: NextRequest) {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
+  const ward = searchParams.get("ward")?.trim() || null;
+
 
   try {
     const preferredAgency = await getFarmerPreferredAgency(userId, coords);
@@ -194,6 +212,14 @@ export async function GET(request: NextRequest) {
     const sellingNearest = await filterSellingAgencies(nearest);
     if (sellingNearest.length > 0) {
       return NextResponse.json(sellingNearest);
+    }
+
+    // Fallback theo xã của user (không có GPS)
+    if (ward) {
+      const wardAgencies = await getAgenciesByWard(ward);
+      if (wardAgencies.length > 0) {
+        return NextResponse.json(wardAgencies);
+      }
     }
 
     const fallbackAgencies = await getFallbackSellingAgencies(coords);
