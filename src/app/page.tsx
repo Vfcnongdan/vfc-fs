@@ -21,7 +21,7 @@ export default function HomePage() {
     useRef<HTMLInputElement>(null),
   ];
 
-  // Auto-redirect if already logged in
+  // Auto-redirect if already logged in + load last phone
   useEffect(() => {
     async function checkSession() {
       try {
@@ -35,6 +35,8 @@ export default function HomePage() {
       }
     }
     checkSession();
+    const lastPhone = localStorage.getItem("lastPhone");
+    if (lastPhone) setPhone(lastPhone);
   }, []);
 
   async function handleSendOtp(e?: React.FormEvent) {
@@ -53,6 +55,7 @@ export default function HomePage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Gửi OTP thất bại");
+      localStorage.setItem("lastPhone", phone);
       setStep("otp");
       setOtp(["", "", "", ""]);
     } catch (err: unknown) {
@@ -184,6 +187,8 @@ export default function HomePage() {
                 <div className="flex w-full">
                   <input
                     type="tel"
+                    name="phone"
+                    autoComplete="tel"
                     placeholder="Nhập vào số điện thoại"
                     className="w-full bg-white/90 rounded-md px-4 py-3 outline-none text-gray-800 placeholder:text-gray-400 font-medium shadow-sm"
                     value={phone}

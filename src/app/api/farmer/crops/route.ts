@@ -34,32 +34,6 @@ export async function GET() {
     });
 
     const cropIdSet = new Set<string>(profileCropIds);
-
-    if (user?.role === "FARMER" && user.farmer?.crop) {
-      const farmerCropStr = user.farmer.crop;
-      const normalizeStr = (s: string) =>
-        s.toLowerCase()
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "")
-          .replace(/^(cay|cây)\s+/i, "")
-          .replace(/[^\w\s]/gi, "")
-          .replace(/\s+/g, " ")
-          .trim();
-
-      const normalizedFarmerCrop = normalizeStr(farmerCropStr);
-
-      if (normalizedFarmerCrop) {
-        const matchingCrops = allCrops.filter(crop => {
-          const normalizedCropName = normalizeStr(crop.name);
-          return normalizedCropName === normalizedFarmerCrop;
-        });
-
-        for (const crop of matchingCrops) {
-          cropIdSet.add(crop.id);
-        }
-      }
-    }
-
     const crops = allCrops.filter(crop => cropIdSet.has(crop.id));
 
     return NextResponse.json(crops);

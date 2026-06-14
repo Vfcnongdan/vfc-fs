@@ -33,6 +33,40 @@ export async function resolveFarmerUser(
         sessionToken,
       },
     });
+
+    let cropIds: string[] = [];
+    if (farmer.crop) {
+      const normalizeStr = (s: string) =>
+        s.toLowerCase()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/^(cay|cây)\s+/i, "")
+          .replace(/[^\w\s]/gi, "")
+          .replace(/\s+/g, " ")
+          .trim();
+
+      const normalizedFarmerCrop = normalizeStr(farmer.crop);
+      if (normalizedFarmerCrop) {
+        const allCrops = await tx.crop.findMany({
+          where: { isActive: true },
+        });
+        const matchingCrops = allCrops.filter(crop => {
+          const normalizedCropName = normalizeStr(crop.name);
+          return normalizedCropName === normalizedFarmerCrop;
+        });
+        cropIds = matchingCrops.map(c => c.id);
+      }
+    }
+
+    await tx.userProfile.create({
+      data: {
+        userId: created.id,
+        cropIds,
+        address: null,
+        notes: null,
+      },
+    });
+
     await tx.farmer.update({
       where: { id: farmer.id },
       data: { userId: created.id },

@@ -9,9 +9,9 @@ export function generateOtp(): string {
   return Math.floor(1000 + Math.random() * 9000).toString();
 }
 
-export async function createOtpRecord(phone: string): Promise<string> {
+export async function createOtpRecord(phone: string, fixedOtp?: string): Promise<string> {
   const variants = getPhoneVariants(phone);
-  const otp = generateOtp();
+  const otp = fixedOtp ?? generateOtp();
   const hashed = await bcrypt.hash(otp, 10);
   const expiresAt = new Date(Date.now() + OTP_TTL_MINUTES * 60 * 1000);
 

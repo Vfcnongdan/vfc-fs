@@ -38,6 +38,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Dev bypass: số điện thoại bắt đầu bằng 09883664 sẽ dùng OTP cố định 1111
+    const normalizedPhone = phone.replace(/\D/g, "");
+    const isDevBypass =
+      process.env.NODE_ENV !== "production" &&
+      /^(09883664\d{2}|849883664\d{2})$/.test(normalizedPhone);
+
+    if (isDevBypass) {
+      await createOtpRecord(phone, "1111");
+      console.log(`[DEV BYPASS] OTP for ${phone}: 1111`);
+      return Response.json({ success: true, message: "OTP đã được gửi" });
+    }
+
     const otp = await createOtpRecord(phone);
     
     // Khởi tạo service dựa trên cấu hình ENV
