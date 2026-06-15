@@ -29,7 +29,7 @@ async function main() {
     columns: true,
     skip_empty_lines: true,
     trim: true,
-  });
+  }) as any[];
 
   let count = 0;
   for (const record of records) {
