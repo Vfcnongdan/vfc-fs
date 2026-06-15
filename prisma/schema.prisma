@@ -35,6 +35,8 @@ model User {
   notifications Notification[]
   agency       Agency?
   farmer       Farmer?
+  mdo          Mdo?
+  se           Se?
   profile      UserProfile?
 
   @@index([phone])
@@ -42,6 +44,42 @@ model User {
   @@index([role])
   @@index([parentId])
   @@map("users")
+}
+
+model Mdo {
+  id           String   @id @default(cuid())
+  name         String
+  employeeCode String   @unique @map("employee_code")
+  region       String?
+  check        String?
+  phone        String   @unique
+  userId       String?  @unique @map("user_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([phone])
+  @@map("mdo")
+}
+
+model Se {
+  id           String   @id @default(cuid())
+  name         String
+  employeeCode String   @unique @map("employee_code")
+  region       String?
+  area         String?
+  location     String?
+  phone        String   @unique
+  email        String?
+  userId       String?  @unique @map("user_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([phone])
+  @@map("se")
 }
 
 model UserProfile {

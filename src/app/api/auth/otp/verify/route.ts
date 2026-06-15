@@ -4,6 +4,8 @@ import { verifyOtp } from "@/lib/otp";
 import { signToken, COOKIE_NAME, COOKIE_OPTIONS } from "@/lib/auth";
 import { linkAgencyIfMissing, resolveAgencyUser } from "@/lib/agencyAuth";
 import { linkFarmerIfMissing, resolveFarmerUser } from "@/lib/farmerAuth";
+import { linkMdoIfMissing, resolveMdoUser } from "@/lib/mdoAuth";
+import { linkSeIfMissing, resolveSeUser } from "@/lib/seAuth";
 import { getPhoneVariants, isValidVietnamesePhone } from "@/lib/phone";
 import { prisma } from "@/lib/prisma";
 import { ensureUserProfile } from "@/lib/userProfile";
@@ -41,12 +43,20 @@ export async function POST(request: NextRequest) {
     if (user) {
       await linkAgencyIfMissing(user, phoneVariants);
       await linkFarmerIfMissing(user, phoneVariants);
+      await linkMdoIfMissing(user, phoneVariants);
+      await linkSeIfMissing(user, phoneVariants);
       user = await prisma.user.update({
         where: { id: user.id },
         data: { lastLoginAt: new Date(), sessionToken },
       });
     } else {
       user = await resolveAgencyUser(phoneVariants, phone, sessionToken);
+      if (!user) {
+        user = await resolveMdoUser(phoneVariants, phone, sessionToken);
+      }
+      if (!user) {
+        user = await resolveSeUser(phoneVariants, phone, sessionToken);
+      }
       if (!user) {
         user = await resolveFarmerUser(phoneVariants, phone, sessionToken);
       }
