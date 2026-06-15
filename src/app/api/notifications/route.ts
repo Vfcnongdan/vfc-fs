@@ -18,6 +18,7 @@ export async function GET(request: NextRequest) {
       take: 10,
       include: {
         order: { select: { id: true, orderNumber: true, status: true } },
+        cropChangeRequest: { select: { id: true, status: true } },
       },
     }),
   ]);
@@ -33,7 +34,13 @@ export async function GET(request: NextRequest) {
       createdAt: notification.createdAt,
       readAt: notification.readAt,
       order: notification.order,
-      href: notificationHrefForRole(user.role, notification.orderId),
+      cropChangeRequest: notification.cropChangeRequest,
+      href: notificationHrefForRole(
+        user.role,
+        notification.type,
+        notification.orderId,
+        notification.cropChangeRequestId,
+      ),
     })),
   });
 }

@@ -59,8 +59,15 @@ export default function SelectCropsPage() {
         body: JSON.stringify({ cropIds: selectedIds }),
       });
       if (res.ok) {
+        const data = await res.json();
+        if (data.pendingApproval) {
+          alert("Thay đổi cây trồng đã được gửi và đang chờ duyệt.");
+        }
         router.push("/farmer");
         router.refresh();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || "Không thể gửi thay đổi cây trồng");
       }
     } catch (err) {
       console.error("Save error:", err);

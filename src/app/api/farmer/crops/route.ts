@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { headers } from "next/headers";
 import { ensureUserProfile } from "@/lib/userProfile";
+import { submitCropChangeRequest } from "@/lib/cropChangeRequests";
 
 export async function GET() {
   const headerList = await headers();
@@ -13,11 +14,6 @@ export async function GET() {
 
   try {
     await ensureUserProfile(userId);
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      include: { farmer: true },
-    });
-
     const profile = await prisma.userProfile.findUnique({
       where: { userId },
       select: { cropIds: true },
@@ -58,33 +54,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "INVALID_INPUT" }, { status: 400 });
     }
 
-    // 1. Verify user exists
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
       return NextResponse.json({ error: "USER_NOT_FOUND" }, { status: 401 });
     }
 
-    // 2. Filter valid cropIds so only active catalog IDs are stored.
-    const validCrops = await prisma.crop.findMany({
-      where: { id: { in: cropIds } },
-      select: { id: true }
-    });
-    const validCropIds = validCrops.map(c => c.id);
+    const result = await submitCropChangeRequest(user, cropIds);
+    if ("error" in result) {
+      return NextResponse.json({ error: result.error }, { status: result.status });
+    }
 
-    await prisma.userProfile.upsert({
-      where: { userId },
-      create: {
-        userId,
-        cropIds: validCropIds,
-        address: null,
-        notes: null,
-      },
-      update: {
-        cropIds: validCropIds,
-      },
+    return NextResponse.json({
+      success: true,
+      pendingApproval: !result.unchanged,
+      requestId: result.unchanged ? null : result.request.id,
     });
-
-    return NextResponse.json({ success: true });
   } catch (error) {
     console.error("[Farmer Crops POST]", error);
     return NextResponse.json({ error: "INTERNAL_ERROR" }, { status: 500 });

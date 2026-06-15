@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useState, useEffect } from "react";
 import { LogoutButton } from "@/components/LogoutButton";
+import { NotificationBell } from "@/components/NotificationBell";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -106,8 +107,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
           </button>
           <Image src="/assets/images/logo.svg" alt="VFC Logo" width={60} height={30} className="h-6 w-auto" />
-          <div className="w-10"></div> {/* Spacer */}
+          <NotificationBell dark />
         </header>
+
+        <div className="hidden items-center justify-end border-b border-neutral-200 bg-white px-8 py-3 sm:flex">
+          <NotificationBell />
+        </div>
 
         <main className="flex-1 p-4 sm:p-8">{children}</main>
       </div>

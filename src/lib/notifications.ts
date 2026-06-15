@@ -62,7 +62,25 @@ export async function notifyOrderStatusChanged(
   });
 }
 
-export function notificationHrefForRole(role: string, orderId: string) {
+export function notificationHrefForRole(
+  role: string,
+  type: string,
+  orderId: string | null,
+  cropChangeRequestId: string | null,
+) {
+  if (type === "CROP_CHANGE_REQUESTED" && cropChangeRequestId) {
+    return `/admin/crop-change-requests/${cropChangeRequestId}`;
+  }
+  if (type === "CROP_CHANGE_PENDING" && cropChangeRequestId) {
+    return `/farmer`;
+  }
+  if (
+    (type === "CROP_CHANGE_APPROVED" || type === "CROP_CHANGE_REJECTED") &&
+    cropChangeRequestId
+  ) {
+    return `/farmer`;
+  }
+  if (!orderId) return `/farmer`;
   if (role === "FARMER") return `/farmer/orders/${orderId}`;
   if (role === "AGENCY" || role === "SUPER_AGENT") {
     return `/agent/orders?orderId=${orderId}`;
