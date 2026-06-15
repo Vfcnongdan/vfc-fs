@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import toast from "react-hot-toast";
 import {
   mergeSelections,
   ProductMultiSelect,
@@ -309,7 +310,7 @@ export default function DiagnosePage() {
         throw new Error(msg);
       }
       setIsOrderModalOpen(false);
-      alert(`Đặt hàng thành công! Mã đơn #${String(data.orderNumber).slice(-8).toUpperCase()}`);
+      toast.success(`Đặt hàng thành công! Mã đơn #${String(data.orderNumber).slice(-8).toUpperCase()}`);
     } catch (e: unknown) {
       setOrderError(e instanceof Error ? e.message : "Có lỗi xảy ra");
     } finally {

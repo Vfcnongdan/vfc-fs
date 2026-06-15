@@ -3,6 +3,10 @@ import { prisma } from "@/lib/prisma";
 
 type CropChangeUser = Pick<User, "id" | "role" | "name">;
 
+function requiresCropChangeApproval(user: CropChangeUser) {
+  return user.role === Role.FARMER || user.role === Role.AGENCY;
+}
+
 function sameCropIds(a: string[], b: string[]) {
   if (a.length !== b.length) return false;
   const aSet = new Set(a);
@@ -25,7 +29,7 @@ export async function findCropChangeReviewer(user: CropChangeUser) {
     return mdo?.user ?? null;
   }
 
-  if (user.role === Role.AGENCY || user.role === Role.SUPER_AGENT) {
+  if (user.role === Role.AGENCY) {
     const agency = await prisma.agency.findUnique({
       where: { userId: user.id },
       select: { salesman: true },
@@ -44,14 +48,6 @@ export async function findCropChangeReviewer(user: CropChangeUser) {
 }
 
 export async function submitCropChangeRequest(user: CropChangeUser, cropIds: string[]) {
-  if (
-    user.role !== Role.FARMER &&
-    user.role !== Role.AGENCY &&
-    user.role !== Role.SUPER_AGENT
-  ) {
-    return { error: "FORBIDDEN", status: 403 } as const;
-  }
-
   const validCrops = await prisma.crop.findMany({
     where: { id: { in: cropIds }, isActive: true },
     select: { id: true },
@@ -67,6 +63,15 @@ export async function submitCropChangeRequest(user: CropChangeUser, cropIds: str
 
   if (sameCropIds(profile.cropIds, validCropIds)) {
     return { ok: true, unchanged: true } as const;
+  }
+
+  if (!requiresCropChangeApproval(user)) {
+    await prisma.userProfile.update({
+      where: { userId: user.id },
+      data: { cropIds: validCropIds },
+    });
+
+    return { ok: true, applied: true } as const;
   }
 
   const reviewer = await findCropChangeReviewer(user);
@@ -128,6 +133,15 @@ export async function submitCropChangeRequest(user: CropChangeUser, cropIds: str
   });
 
   return { ok: true, request } as const;
+}
+
+export type CropChangeRequestResult = Awaited<ReturnType<typeof submitCropChangeRequest>>;
+type PendingCropChangeRequestResult = Extract<CropChangeRequestResult, { request: unknown }>;
+
+export function hasPendingCropChangeRequest(
+  result: CropChangeRequestResult,
+): result is PendingCropChangeRequestResult {
+  return "request" in result;
 }
 
 export async function canReviewCropChangeRequest(

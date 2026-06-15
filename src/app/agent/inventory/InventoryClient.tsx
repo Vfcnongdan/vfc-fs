@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
+import toast from "react-hot-toast";
 import { Plus, Search, Edit2, Loader2, PackageX } from "lucide-react";
 
 export default function InventoryClient({ products }: { products: any[] }) {
@@ -51,7 +52,7 @@ export default function InventoryClient({ products }: { products: any[] }) {
         setQuantity("");
         setSelectedProduct("");
       } else {
-        alert("Có lỗi xảy ra khi lưu");
+        toast.error("Có lỗi xảy ra khi lưu");
       }
     } catch (err) {
       console.error(err);

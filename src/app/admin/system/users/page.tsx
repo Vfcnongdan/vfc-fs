@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Role } from "@prisma/client";
+import toast from "react-hot-toast";
 
 interface User {
   id: string;
@@ -121,7 +122,7 @@ export default function UserManagementPage() {
         setTotal((prev) => prev - 1);
       } else {
         const data = await res.json();
-        alert(data.error || "Xóa thất bại");
+        toast.error(data.error || "Xóa thất bại");
       }
     } catch (err) {
       console.error(err);
@@ -175,11 +176,11 @@ export default function UserManagementPage() {
         setSelectedUser(null);
       } else {
         const errorData = await res.json();
-        alert(errorData.error || "Thao tác thất bại");
+        toast.error(errorData.error || "Thao tác thất bại");
       }
     } catch (err) {
       console.error(err);
-      alert("Có lỗi xảy ra");
+      toast.error("Có lỗi xảy ra");
     }
   };
 

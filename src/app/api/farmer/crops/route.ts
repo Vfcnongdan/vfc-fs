@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { headers } from "next/headers";
 import { ensureUserProfile } from "@/lib/userProfile";
-import { submitCropChangeRequest } from "@/lib/cropChangeRequests";
+import {
+  hasPendingCropChangeRequest,
+  submitCropChangeRequest,
+} from "@/lib/cropChangeRequests";
 
 export async function GET() {
   const headerList = await headers();
@@ -64,10 +67,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: result.error }, { status: result.status });
     }
 
+    const pendingRequest = hasPendingCropChangeRequest(result) ? result.request : null;
+
     return NextResponse.json({
       success: true,
-      pendingApproval: !result.unchanged,
-      requestId: result.unchanged ? null : result.request.id,
+      pendingApproval: pendingRequest !== null,
+      requestId: pendingRequest?.id ?? null,
+      applied: pendingRequest === null,
     });
   } catch (error) {
     console.error("[Farmer Crops POST]", error);

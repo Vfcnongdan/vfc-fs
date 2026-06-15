@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
+import toast from "react-hot-toast";
 import { getCropIcon } from "@/lib/cropIcons";
 
 interface Crop {
@@ -61,13 +62,15 @@ export default function SelectCropsPage() {
       if (res.ok) {
         const data = await res.json();
         if (data.pendingApproval) {
-          alert("Thay đổi cây trồng đã được gửi và đang chờ duyệt.");
+          toast.success("Thay đổi cây trồng đã được gửi và đang chờ duyệt.");
+        } else if (data.applied) {
+          toast.success("Thay đổi cây trồng đã được cập nhật.");
         }
         router.push("/farmer");
         router.refresh();
       } else {
         const data = await res.json().catch(() => ({}));
-        alert(data.error || "Không thể gửi thay đổi cây trồng");
+        toast.error(data.error || "Không thể gửi thay đổi cây trồng");
       }
     } catch (err) {
       console.error("Save error:", err);
