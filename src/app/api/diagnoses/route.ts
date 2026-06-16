@@ -19,18 +19,24 @@ export async function POST(request: NextRequest) {
   if (!files.length) return apiError("NO_IMAGES", 400);
 
   const base64Images: string[] = [];
+  const base64ImagesSmall: string[] = [];
   const sharp = (await import("sharp")).default;
 
   for (const file of files) {
     let buffer: Buffer | null = Buffer.from(await file.arrayBuffer());
 
-    // Optimize image: resize to max 256px and compress aggressively
+    // Optimize image: resize to max 512px and compress aggressively
     const optimizedBuffer = await sharp(buffer)
+      .resize(512, 512, { fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: 85 })
+      .toBuffer();
+    base64Images.push(optimizedBuffer.toString("base64"));
+
+    const smallBuffer = await sharp(buffer)
       .resize(256, 256, { fit: "inside", withoutEnlargement: true })
       .jpeg({ quality: 40 })
       .toBuffer();
-
-    base64Images.push(optimizedBuffer.toString("base64"));
+    base64ImagesSmall.push(smallBuffer.toString("base64"));
 
     // Free up buffer memory
     buffer = null;
@@ -45,11 +51,29 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  // Await AI analysis to prevent Vercel from killing the serverless function mid-execution
   try {
+    const validationResult = await validateImagesWithGroq(base64ImagesSmall, cropType ?? undefined);
+
+    if (!validationResult.isValid) {
+      await prisma.plantDiagnosis.update({
+        where: { id: diagnosis.id },
+        data: {
+          rawAiResponse: validationResult,
+          summary: validationResult.userGuidance,
+          status: DiagnosisStatus.DONE,
+        },
+      });
+      console.log(`[AI Diagnosis Validation Failed] ID: ${diagnosis.id}`, validationResult);
+      return apiError(validationResult.userGuidance, 400);
+    }
+
     await runAiDiagnosis(diagnosis.id, base64Images, cropType ?? undefined);
   } catch (err) {
     console.error("[POST AI Diagnosis Error]", err);
+    await prisma.plantDiagnosis.update({
+      where: { id: diagnosis.id },
+      data: { status: DiagnosisStatus.FAILED },
+    });
   }
 
   const updatedDiagnosis = await prisma.plantDiagnosis.findUnique({
@@ -93,6 +117,20 @@ export async function GET(request: NextRequest) {
 
 type AiProvider = "gemini" | "groq";
 
+type ImageValidationReasonCode = "VALID" | "NOT_A_PLANT" | "WRONG_CROP" | "BLURRY_IMAGE";
+
+type ImageValidationResponse = {
+  isValid: boolean;
+  reasonCode: ImageValidationReasonCode;
+  userGuidance: string;
+};
+
+const INVALID_IMAGE_GUIDANCE: Record<Exclude<ImageValidationReasonCode, "VALID">, string> = {
+  NOT_A_PLANT: "Hệ thống không nhận diện được cây trồng trong ảnh. Vui lòng chụp rõ phần lá hoặc thân cây bị bệnh.",
+  WRONG_CROP: "Ảnh chụp có vẻ không phải là cây trồng. Vui lòng kiểm tra lại loại cây bạn đã chọn.",
+  BLURRY_IMAGE: "Ảnh chụp bị mờ hoặc quá xa. Bạn vui lòng đưa camera lại gần vết bệnh trên cây (khoảng 20-30cm), giữ chắc tay và chụp lại nơi có đủ ánh sáng nhé.",
+};
+
 type AiDiagnosisResponse = {
   disease?: string;
   severity?: string;
@@ -119,10 +157,11 @@ function buildDiagnosisPrompt(
   cropType?: string,
 ) {
   return `Bạn là chuyên gia nông nghiệp của VFC. Hãy phân tích hình ảnh cây trồng${cropType ? ` (loại: ${cropType})` : ""} và:
-1. Xác định bệnh/vấn đề (nếu có). Cung cấp thông tin chi tiết tên bệnh.
-2. Đánh giá mức độ bệnh theo thang của riêng bệnh đó (nếu có), hoặc đánh giá mức độ chung chung (nhẹ/trung bình/nặng).
-3. Đề xuất hướng xử lý.
-4. CHỌN ra tối đa 3 sản phẩm PHÙ HỢP NHẤT từ danh sách dưới đây dựa trên công dụng của chúng:
+1. Loại trừ các nguyên nhân sinh lý (thiếu nước, sốc nhiệt ...). Đưa ra chẩn đoán cuối cùng về loại nấm hoặc vi khuẩn gây bệnh kèm theo tỷ lệ phần trăm chính xác.
+2. Xác định bệnh/vấn đề (nếu có). Cung cấp thông tin chi tiết tên bệnh, hãy dùng tên bệnh thông dụng nhất của nông dân.
+3. Đánh giá mức độ bệnh theo thang của riêng bệnh đó (nếu có), hoặc đánh giá mức độ chung chung (nhẹ/trung bình/nặng).
+4. Đề xuất hướng xử lý.
+5. CHỌN ra tối đa 3 sản phẩm PHÙ HỢP NHẤT từ danh sách dưới đây dựa trên công dụng của chúng:
 ${JSON.stringify(productContext)}
 
 Đối với mỗi sản phẩm đề nghị, phải ghi rõ CÔNG DỤNG RÕ RÀNG đối với tình trạng bệnh của cây đang hỏi trong phần "reasons".
@@ -138,14 +177,141 @@ Trả về kết quả dưới dạng JSON thuần túy (không có markdown) v�
 }`;
 }
 
-function parseAiJson(text: string, provider: AiProvider): AiDiagnosisResponse {
+function parseJsonBlock(text: string, provider: string) {
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
-    console.error(`[AI Diagnosis Parse Error] No JSON block found in ${provider} response. Raw text:`, text);
+    console.error(`[AI Parse Error] No JSON block found in ${provider} response. Raw text:`, text);
     throw new Error(`${provider} failed to return valid JSON`);
   }
 
   return JSON.parse(jsonMatch[0]);
+}
+
+function parseAiJson(text: string, provider: AiProvider): AiDiagnosisResponse {
+  return parseJsonBlock(text, provider);
+}
+
+function parseImageValidationJson(text: string, cropType?: string): ImageValidationResponse {
+  const parsed = parseJsonBlock(text, "groq-plan-validation") as Partial<ImageValidationResponse>;
+
+  if (typeof parsed.isValid !== "boolean") {
+    throw new Error("Groq plan validation returned invalid isValid value");
+  }
+
+  if (
+    parsed.reasonCode !== "VALID" &&
+    parsed.reasonCode !== "NOT_A_PLANT" &&
+    parsed.reasonCode !== "WRONG_CROP" &&
+    parsed.reasonCode !== "BLURRY_IMAGE"
+  ) {
+    throw new Error("Groq plan validation returned invalid reasonCode value");
+  }
+
+  if (typeof parsed.userGuidance !== "string") {
+    throw new Error("Groq plan validation returned invalid userGuidance value");
+  }
+
+  if (parsed.isValid && parsed.reasonCode !== "VALID") {
+    throw new Error("Groq plan validation returned inconsistent isValid and reasonCode");
+  }
+
+  if (!parsed.isValid && parsed.reasonCode === "VALID") {
+    throw new Error("Groq plan validation returned inconsistent invalid VALID response");
+  }
+
+  if (parsed.isValid) {
+    return {
+      isValid: true,
+      reasonCode: "VALID",
+      userGuidance: "",
+    };
+  }
+
+  const fallbackGuidance =
+    parsed.reasonCode === "WRONG_CROP"
+      ? INVALID_IMAGE_GUIDANCE.WRONG_CROP.replace("cây trồng", cropType || "cây trồng")
+      : parsed.reasonCode === "NOT_A_PLANT"
+        ? INVALID_IMAGE_GUIDANCE.NOT_A_PLANT
+        : INVALID_IMAGE_GUIDANCE.BLURRY_IMAGE;
+
+  return {
+    isValid: false,
+    reasonCode: parsed.reasonCode,
+    userGuidance: parsed.userGuidance.trim() || fallbackGuidance,
+  };
+}
+
+function buildImageValidationPrompt(cropType?: string) {
+  return `Bạn là một bộ lọc bảo mật và kiểm định chất lượng hình ảnh đầu vào cho ứng dụng nông nghiệp. Người dùng sẽ tải lên một bức ảnh và cho biết họ đang muốn kiểm tra cây gì (Tham số: target_crop: ${cropType || "không có thông tin"}).
+Hãy phân tích bức ảnh về mặt chi tiết vết bệnh và trả về một đối tượng JSON duy nhất theo cấu trúc nghiêm ngặt sau:
+{
+  "isValid": true hoặc false,
+  "reasonCode": "VALID" | "NOT_A_PLANT" | "WRONG_CROP" | "BLURRY_IMAGE",
+  "userGuidance": "Chuỗi tiếng Việt hướng dẫn nông dân chụp lại nếu isValid là false, hoặc chuỗi trống nếu true"
+}
+
+Nếu ảnh không chứa cây trồng, bộ phận của cây (lá, thân, rễ): isValid = false, reasonCode = "NOT_A_PLANT", userGuidance = "Hệ thống không nhận diện được cây trồng trong ảnh. Vui lòng chụp rõ phần lá hoặc thân cây bị bệnh."
+Nếu ảnh là cây khác hoàn toàn so với target_crop (Ví dụ: người dùng chọn kiểm tra Cây Lúa nhưng chụp ảnh Cây Cà Phê): isValid = false, reasonCode = "WRONG_CROP", userGuidance = "Ảnh chụp có vẻ không phải là ${cropType || "cây trồng"}. Vui lòng kiểm tra lại loại cây bạn đã chọn."
+Nếu ảnh quá mờ, quá tối, quá sáng, chụp quá xa hoặc có dấu hiệu không nhìn rõ chi tiết vết bệnh: isValid = false, reasonCode = "BLURRY_IMAGE", userGuidance = "Ảnh chụp không rõ chi tiết vết bệnh. Bạn vui lòng đưa camera lại gần vết bệnh trên cây (khoảng 20-30cm), giữ chắc tay và chụp lại rõ vết bệnh nhé."
+Nếu ảnh hợp lệ và phù hợp với target_crop: isValid = true, reasonCode = "VALID", userGuidance = ""`;
+}
+
+async function validateImagesWithGroq(
+  base64Images: string[],
+  cropType?: string,
+): Promise<ImageValidationResponse> {
+  const hasApiKey = !!process.env.GROQ_API_KEY_PLAN_VALIDATION;
+  console.log(`[AI Plan Validation Groq API Key Check] Key exists: ${hasApiKey}`);
+  if (!hasApiKey) {
+    throw new Error("GROQ_API_KEY_PLAN_VALIDATION is not defined in environment variables");
+  }
+
+  const content: Array<
+    | { type: "text"; text: string }
+    | { type: "image_url"; image_url: { url: string } }
+  > = [{ type: "text", text: buildImageValidationPrompt(cropType) }];
+
+  for (let idx = 0; idx < base64Images.length; idx++) {
+    const base64Data = base64Images[idx];
+    console.log(`[AI Plan Validation Groq Payload] Image ${idx} size: ${(base64Data.length * 0.75 / 1024).toFixed(2)} KB`);
+    content.push({
+      type: "image_url",
+      image_url: {
+        url: `data:image/jpeg;base64,${base64Data}`,
+      },
+    });
+  }
+
+  console.log("[AI Plan Validation API Call] Sending request to Groq API...");
+  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.GROQ_API_KEY_PLAN_VALIDATION}`,
+    },
+    body: JSON.stringify({
+      model: process.env.GROQ_VISION_MODEL || "meta-llama/llama-4-scout-17b-16e-instruct",
+      messages: [{ role: "user", content }],
+      temperature: 0.1,
+      max_completion_tokens: 512,
+      response_format: { type: "json_object" },
+      stream: false,
+    }),
+  });
+
+  const responseText = await res.text();
+  const data = JSON.parse(responseText || "{}");
+  if (!res.ok) {
+    throw new Error(`Groq plan validation API failed with ${res.status}: ${JSON.stringify(data)}`);
+  }
+
+  const text = data?.choices?.[0]?.message?.content;
+  if (typeof text !== "string" || text.length === 0) {
+    throw new Error("Groq plan validation API returned an empty response");
+  }
+
+  console.log(`[AI Plan Validation Groq Response] Received response. Text length: ${text.length}`);
+  return parseImageValidationJson(text, cropType);
 }
 
 async function analyzeWithGemini(
@@ -162,6 +328,9 @@ async function analyzeWithGemini(
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
   const model = genAI.getGenerativeModel({
     model: process.env.GEMINI_MODEL || "gemini-flash-latest",
+    generationConfig: {
+      temperature: 0.1
+    }
   });
 
   const parts: GeminiContentPart[] = [{ text: prompt }];
