@@ -45,7 +45,7 @@ export function NotificationBell({ dark = false }: { dark?: boolean }) {
 
   useEffect(() => {
     const timeoutId = window.setTimeout(loadNotifications, 0);
-    const intervalId = window.setInterval(loadNotifications, 30000);
+    const intervalId = window.setInterval(loadNotifications, 300000);
     return () => {
       window.clearTimeout(timeoutId);
       window.clearInterval(intervalId);

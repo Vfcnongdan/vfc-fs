@@ -13,6 +13,8 @@
 @layer base {
   * {
     @apply border-neutral-200;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
   }
   body {
     @apply bg-neutral-50 text-neutral-900 antialiased;
@@ -35,4 +37,20 @@
   .card {
     @apply rounded-2xl bg-white p-4 shadow-sm ring-1 ring-neutral-200/60;
   }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.5);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(107, 114, 128, 0.8);
 }

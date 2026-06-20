@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getRequestUser, apiError, apiOk } from "@/lib/request";
 import { DiagnosisStatus } from "@prisma/client";
+import { planStageDesease } from "@/lib/deseaseDetails";
 
 export const maxDuration = 60; // Tăng timeout cho Vercel Serverless Function (tối đa 60s cho Hobby)
 
@@ -14,6 +15,7 @@ export async function POST(request: NextRequest) {
   if (!formData) return apiError("INVALID_FORM_DATA", 400);
 
   const cropType = formData.get("cropType") as string | null;
+  const growthStage = formData.get("growthStage") as string | null;
   // Handle file uploads (placeholder — real impl: upload to GCS/S3)
   const files = formData.getAll("images") as File[];
   if (!files.length) return apiError("NO_IMAGES", 400);
@@ -67,7 +69,7 @@ export async function POST(request: NextRequest) {
       return apiError(validationResult.userGuidance, 400);
     }
 
-    await runAiDiagnosis(diagnosis.id, base64Images, cropType ?? undefined);
+    await runAiDiagnosis(diagnosis.id, base64Images, cropType ?? undefined, growthStage ?? undefined);
   } catch (err) {
     console.error("[POST AI Diagnosis Error]", err);
     await prisma.plantDiagnosis.update({
@@ -136,7 +138,9 @@ type AiDiagnosisResponse = {
   severity?: string;
   summary?: string;
   confidence?: number;
-  suggestedProductIds?: string[];
+  vfcSolutionText?: string;
+  solutionSets?: { name: string; products: string[] }[];
+  suggestedProducts?: string[];
   reasons?: Record<string, string>;
   aiProvider?: AiProvider;
   fallbackFrom?: AiProvider;
@@ -152,28 +156,43 @@ type GeminiContentPart =
   | { text: string }
   | { inlineData: { data: string; mimeType: "image/jpeg" } };
 
-function buildDiagnosisPrompt(
-  productContext: ProductContextItem[],
-  cropType?: string,
-) {
-  return `Bạn là chuyên gia nông nghiệp của VFC. Hãy phân tích hình ảnh cây trồng${cropType ? ` (loại: ${cropType})` : ""} và:
-1. Loại trừ các nguyên nhân sinh lý (thiếu nước, sốc nhiệt ...). Đưa ra chẩn đoán cuối cùng về loại nấm hoặc vi khuẩn gây bệnh kèm theo tỷ lệ phần trăm chính xác.
-2. Xác định bệnh/vấn đề (nếu có). Cung cấp thông tin chi tiết tên bệnh, hãy dùng tên bệnh thông dụng nhất của nông dân.
-3. Đánh giá mức độ bệnh theo thang của riêng bệnh đó (nếu có), hoặc đánh giá mức độ chung chung (nhẹ/trung bình/nặng).
-4. Đề xuất hướng xử lý.
-5. CHỌN ra tối đa 3 sản phẩm PHÙ HỢP NHẤT từ danh sách dưới đây dựa trên công dụng của chúng:
-${JSON.stringify(productContext)}
+type ReferenceData = { text: string; base64Image?: string | null };
 
-Đối với mỗi sản phẩm đề nghị, phải ghi rõ CÔNG DỤNG RÕ RÀNG đối với tình trạng bệnh của cây đang hỏi trong phần "reasons".
+async function fetchAndOptimizeImage(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const arrayBuffer = await res.arrayBuffer();
+    const sharp = (await import("sharp")).default;
+    const buffer = await sharp(Buffer.from(arrayBuffer))
+      .resize(256, 256, { fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: 60 })
+      .toBuffer();
+    return buffer.toString("base64");
+  } catch (err) {
+    console.error("Failed to fetch/optimize ref image:", url, err);
+    return null;
+  }
+}
+
+function buildDiagnosisPromptText(cropType?: string) {
+  return `Bạn là chuyên gia nông nghiệp của VFC. Hãy phân tích hình ảnh cây trồng của nông dân${cropType ? ` (loại: ${cropType})` : ""} và so sánh với các dữ liệu bệnh tham khảo của VFC để:
+1. Đưa ra chẩn đoán cuối cùng về loại nấm, vi khuẩn hoặc sâu hại gây bệnh, ưu tiên kết quả khớp với dữ liệu VFC nếu triệu chứng tương đồng.
+2. Xác định chi tiết tên bệnh, mức độ bệnh.
+3. Đề xuất hướng xử lý.
+4. Trích xuất CHÍNH XÁC tên các sản phẩm (từ phần Giải pháp VFC / vfcSolution) và phân chia chúng thành các "bộ giải pháp" tương ứng nếu vfcSolution đề xuất nhiều lựa chọn (chữ "hoặc", "luân phiên"). Nếu "Không phun", để rỗng mảng.
 
 Trả về kết quả dưới dạng JSON thuần túy (không có markdown) với format: 
 { 
-  "disease": "tên bệnh (kèm thông tin chi tiết)", 
-  "severity": "mức độ bệnh (theo thang riêng của bệnh hoặc nhẹ/trung bình/nặng)", 
+  "disease": "tên bệnh", 
+  "severity": "mức độ bệnh", 
   "summary": "tóm tắt ngắn gọn hướng xử lý", 
-  "confidence": 0-1,
-  "suggestedProductIds": ["id_san_pham_1", "id_san_pham_2"],
-  "reasons": { "id_san_pham_1": "công dụng rõ ràng của sản phẩm đối với tình trạng cây đang hỏi" }
+  "confidence": 0.9,
+  "vfcSolutionText": "Câu Giải pháp VFC nguyên bản",
+  "solutionSets": [
+    { "name": "Tên bộ giải pháp (ví dụ: Bộ 1, Bộ luân phiên...)", "products": ["tên sản phẩm 1", "tên sản phẩm 2"] }
+  ],
+  "reasons": { "tên sản phẩm 1": "công dụng rõ ràng của sản phẩm đối với tình trạng cây" }
 }`;
 }
 
@@ -316,7 +335,8 @@ async function validateImagesWithGroq(
 
 async function analyzeWithGemini(
   prompt: string,
-  base64Images: string[],
+  userImages: string[],
+  referenceData: ReferenceData[]
 ): Promise<AiDiagnosisResponse> {
   const hasApiKey = !!process.env.GEMINI_API_KEY;
   console.log(`[AI Diagnosis Gemini API Key Check] Key exists: ${hasApiKey}`);
@@ -328,36 +348,36 @@ async function analyzeWithGemini(
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
   const model = genAI.getGenerativeModel({
     model: process.env.GEMINI_MODEL || "gemini-flash-latest",
-    generationConfig: {
-      temperature: 0.1
-    }
+    generationConfig: { temperature: 0.1 }
   });
 
-  const parts: GeminiContentPart[] = [{ text: prompt }];
-
-  for (let idx = 0; idx < base64Images.length; idx++) {
-    const base64Data = base64Images[idx];
-    console.log(`[AI Diagnosis Gemini Payload] Image ${idx} size: ${(base64Data.length * 0.75 / 1024).toFixed(2)} KB`);
-    parts.push({
-      inlineData: {
-        data: base64Data,
-        mimeType: "image/jpeg",
-      },
-    });
+  const parts: GeminiContentPart[] = [{ text: "Ảnh cây trồng của nông dân:" }];
+  for (const b64 of userImages) {
+    parts.push({ inlineData: { data: b64, mimeType: "image/jpeg" } });
   }
+
+  parts.push({ text: "\n\nDữ liệu bệnh tham khảo của VFC:" });
+  for (const ref of referenceData) {
+    parts.push({ text: "\n" + ref.text });
+    if (ref.base64Image) {
+      parts.push({ inlineData: { data: ref.base64Image, mimeType: "image/jpeg" } });
+    }
+  }
+
+  parts.push({ text: `\n\n${prompt}` });
 
   console.log("[AI Diagnosis API Call] Sending request to Gemini API...");
   const result = await model.generateContent(parts);
   const text = result.response.text();
   console.log(`[AI Diagnosis Gemini Response] Received response. Text length: ${text.length}`);
-  parts.length = 0;
-
+  
   return parseAiJson(text, "gemini");
 }
 
 async function analyzeWithGroq(
   prompt: string,
-  base64Images: string[],
+  userImages: string[],
+  referenceData: ReferenceData[]
 ): Promise<AiDiagnosisResponse> {
   const hasApiKey = !!process.env.GROQ_API_KEY;
   console.log(`[AI Diagnosis Groq API Key Check] Key exists: ${hasApiKey}`);
@@ -365,21 +385,20 @@ async function analyzeWithGroq(
     throw new Error("GROQ_API_KEY is not defined in environment variables");
   }
 
-  const content: Array<
-    | { type: "text"; text: string }
-    | { type: "image_url"; image_url: { url: string } }
-  > = [{ type: "text", text: prompt }];
-
-  for (let idx = 0; idx < base64Images.length; idx++) {
-    const base64Data = base64Images[idx];
-    console.log(`[AI Diagnosis Groq Payload] Image ${idx} size: ${(base64Data.length * 0.75 / 1024).toFixed(2)} KB`);
-    content.push({
-      type: "image_url",
-      image_url: {
-        url: `data:image/jpeg;base64,${base64Data}`,
-      },
-    });
+  const content: Array<any> = [{ type: "text", text: "Ảnh cây trồng của nông dân:" }];
+  for (const b64 of userImages) {
+    content.push({ type: "image_url", image_url: { url: `data:image/jpeg;base64,${b64}` } });
   }
+
+  content.push({ type: "text", text: "\n\nDữ liệu bệnh tham khảo của VFC:" });
+  for (const ref of referenceData) {
+    content.push({ type: "text", text: "\n" + ref.text });
+    if (ref.base64Image) {
+      content.push({ type: "image_url", image_url: { url: `data:image/jpeg;base64,${ref.base64Image}` } });
+    }
+  }
+
+  content.push({ type: "text", text: `\n\n${prompt}` });
 
   console.log("[AI Diagnosis API Call] Sending request to Groq API...");
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -400,14 +419,10 @@ async function analyzeWithGroq(
 
   const responseText = await res.text();
   const data = JSON.parse(responseText || "{}");
-  if (!res.ok) {
-    throw new Error(`Groq API failed with ${res.status}: ${JSON.stringify(data)}`);
-  }
+  if (!res.ok) throw new Error(`Groq API failed with ${res.status}: ${JSON.stringify(data)}`);
 
   const text = data?.choices?.[0]?.message?.content;
-  if (typeof text !== "string" || text.length === 0) {
-    throw new Error("Groq API returned an empty response");
-  }
+  if (!text) throw new Error("Groq API returned an empty response");
 
   console.log(`[AI Diagnosis Groq Response] Received response. Text length: ${text.length}`);
   return parseAiJson(text, "groq");
@@ -415,16 +430,17 @@ async function analyzeWithGroq(
 
 async function analyzeWithFallback(
   prompt: string,
-  base64Images: string[],
+  userImages: string[],
+  referenceData: ReferenceData[]
 ): Promise<AiDiagnosisResponse> {
   try {
-    const parsed = await analyzeWithGemini(prompt, base64Images);
+    const parsed = await analyzeWithGemini(prompt, userImages, referenceData);
     return { ...parsed, aiProvider: "gemini" };
   } catch (geminiError) {
     console.error("[AI Diagnosis Gemini Error] Falling back to Groq", geminiError);
   }
 
-  const parsed = await analyzeWithGroq(prompt, base64Images);
+  const parsed = await analyzeWithGroq(prompt, userImages, referenceData);
   return { ...parsed, aiProvider: "groq", fallbackFrom: "gemini" };
 }
 
@@ -432,36 +448,49 @@ async function runAiDiagnosis(
   diagnosisId: string,
   base64Images: string[],
   cropType?: string,
+  growthStage?: string
 ) {
-  console.log(`[AI Diagnosis Start] ID: ${diagnosisId}, Crop: ${cropType || "N/A"}, Images count: ${base64Images.length}`);
+  console.log(`[AI Diagnosis Start] ID: ${diagnosisId}, Crop: ${cropType}, Stage: ${growthStage}`);
   
-  // 1. Fetch all available products and their targets for AI context
   const allProducts = await prisma.product.findMany({
     where: { isActive: true },
-    include: { detail: true },
+    select: { id: true, name: true }
   });
 
-  const productContext = allProducts.map((p) => ({
-    id: p.id,
-    name: p.name,
-    targets: p.detail?.targetDiseases || "",
-  }));
+  const relevantDiseases = planStageDesease.filter(
+    (d) => d.cropType === cropType && d.growthStage === growthStage
+  );
 
-  console.log(`[AI Diagnosis Context] Products count: ${productContext.length}`);
+  const referenceData: ReferenceData[] = [];
+  for (const d of relevantDiseases) {
+    let b64 = null;
+    if (d.imageUrl) {
+      const url = Array.isArray(d.imageUrl) ? d.imageUrl[0] : d.imageUrl;
+      b64 = await fetchAndOptimizeImage(url);
+    }
+    const text = `- Bệnh: ${d.detail} (${d.pestDisease})\n- Mức độ: ${d.severityLevel}\n- Mô tả: ${d.description}\n- Giải pháp VFC: ${d.vfcSolution}`;
+    referenceData.push({ text, base64Image: b64 });
+  }
 
-  const prompt = buildDiagnosisPrompt(productContext, cropType);
+  const prompt = buildDiagnosisPromptText(cropType);
 
   try {
-    const parsed = await analyzeWithFallback(prompt, base64Images);
+    const parsed = await analyzeWithFallback(prompt, base64Images, referenceData);
 
-    const suggestedProductIds: string[] = parsed.suggestedProductIds ?? [];
-    
-    // Lọc chỉ giữ lại những ID thực sự tồn tại trong Database của Server để tránh lỗi Foreign Key
-    const validProductIds = suggestedProductIds.filter((pid: string) => 
-      allProducts.some((p) => p.id === pid)
-    );
+    const validProductIds: string[] = [];
+    const reasonsMap: Record<string, string> = {};
 
-    console.log(`[AI Diagnosis DB Update] Updating DB for ${diagnosisId}. Status: DONE, suggested products: ${validProductIds.join(", ")}`);
+    const extractedProducts = parsed.solutionSets?.flatMap(s => s.products) || parsed.suggestedProducts || [];
+    for (const pName of extractedProducts) {
+      const product = allProducts.find((p) => 
+        p.name.toLowerCase().includes(pName.toLowerCase()) || 
+        pName.toLowerCase().includes(p.name.toLowerCase())
+      );
+      if (product && !validProductIds.includes(product.id)) {
+        validProductIds.push(product.id);
+        reasonsMap[product.id] = parsed.reasons?.[pName] || `Phù hợp với triệu chứng: ${parsed.disease}`;
+      }
+    }
 
     await prisma.plantDiagnosis.update({
       where: { id: diagnosisId },
@@ -471,18 +500,16 @@ async function runAiDiagnosis(
         confidence: parsed.confidence,
         status: DiagnosisStatus.DONE,
         suggestions: {
-          create: validProductIds.map((pid: string, i: number) => ({
+          create: validProductIds.map((pid, i) => ({
             productId: pid,
-            reason:
-              parsed.reasons?.[pid] ||
-              `Phù hợp với triệu chứng: ${parsed.disease}`,
+            reason: reasonsMap[pid] || "",
             rank: i + 1,
           })),
         },
       },
     });
     
-    console.log(`[AI Diagnosis Success] ID: ${diagnosisId}`, parsed);
+    console.log(`[AI Diagnosis Success] ID: ${diagnosisId}`);
   } catch (err) {
     console.error(`[AI Diagnosis Error] ID: ${diagnosisId}`, err);
     await prisma.plantDiagnosis.update({

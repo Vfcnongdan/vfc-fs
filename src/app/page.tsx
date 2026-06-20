@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import PageLoadingOverlay from "@/components/PageLoadingOverlay";
 
 type Step = "phone" | "otp";
 
@@ -12,6 +13,7 @@ export default function HomePage() {
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState(["", "", "", ""]);
   const [loading, setLoading] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
   const [error, setError] = useState("");
   const [agreed, setAgreed] = useState(false);
   const otpRefs = [
@@ -29,15 +31,18 @@ export default function HomePage() {
         if (res.ok) {
           router.push("/farmer");
           router.refresh();
+          return;
         }
-      } catch (err) {
+      } catch {
         // Not logged in
       }
+
+      setCheckingSession(false);
+      const lastPhone = localStorage.getItem("lastPhone");
+      if (lastPhone) setPhone(lastPhone);
     }
     checkSession();
-    const lastPhone = localStorage.getItem("lastPhone");
-    if (lastPhone) setPhone(lastPhone);
-  }, []);
+  }, [router]);
 
   async function handleSendOtp(e?: React.FormEvent) {
     if (e) e.preventDefault();
@@ -136,6 +141,7 @@ export default function HomePage() {
 
   return (
     <main className="relative min-h-screen flex flex-col items-center px-8 pt-6 bg-[#0C4A3F] overflow-hidden font-sans">
+      {checkingSession && <PageLoadingOverlay message="Đang đăng nhập..." />}
       {/* Background */}
       <div className="absolute inset-0 z-0">
         <Image

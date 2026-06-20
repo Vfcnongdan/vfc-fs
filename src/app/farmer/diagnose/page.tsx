@@ -1,6 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Camera,
+  ImagePlus,
+  Leaf,
+  Search,
+  Sprout,
+  UploadCloud,
+} from "lucide-react";
 import toast from "react-hot-toast";
 import {
   mergeSelections,
@@ -8,6 +16,7 @@ import {
   selectionTotal,
   type MultiSelectProduct,
 } from "@/components/ProductMultiSelect";
+import { cropGrowthStageOptions } from "@/lib/deseaseDetails";
 import { useCropStore } from "@/store/useCropStore";
 
 type AgencyCatalog = {
@@ -41,6 +50,8 @@ type DiagnosisResult = {
   rawAiResponse?: {
     disease?: string;
     severity?: string;
+    vfcSolutionText?: string;
+    solutionSets?: { name: string; products: string[] }[];
   };
   suggestions?: Array<{
     rank: number;
@@ -59,8 +70,10 @@ export default function DiagnosePage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [previews, setPreviews] = useState<string[]>([]);
   const [cropType, setCropType] = useState("");
+  const [growthStage, setGrowthStage] = useState("");
   const { userCrops, fetchUserCrops } = useCropStore();
   const [loading, setLoading] = useState(false);
+  const [analyzeCountdown, setAnalyzeCountdown] = useState<number>(20);
   const [result, setResult] = useState<DiagnosisResult | null>(null);
   const [error, setError] = useState("");
   const [blockedTimeRemaining, setBlockedTimeRemaining] = useState<number>(0);
@@ -85,6 +98,16 @@ export default function DiagnosePage() {
         .filter((id): id is string => Boolean(id)) ?? [],
     [result?.suggestions],
   );
+
+  const growthStageOptions = useMemo(
+    () =>
+      cropGrowthStageOptions.find((item) => item.cropType === cropType)
+        ?.growthStages ?? [],
+    [cropType],
+  );
+
+  const shouldSelectGrowthStage = growthStageOptions.length > 0;
+  console.log('growthStageOptions', growthStageOptions)
 
   const defaultLineQty = Math.max(1, Math.ceil(parseFloat(farmArea) || 1));
 
@@ -361,6 +384,17 @@ export default function DiagnosePage() {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (loading) {
+      setAnalyzeCountdown(20);
+      interval = setInterval(() => {
+        setAnalyzeCountdown((prev) => (prev > 0 ? prev - 1 : 0));
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [loading]);
+
   function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
     // Only take the first image
@@ -374,6 +408,10 @@ export default function DiagnosePage() {
     if (!fileRef.current?.files?.length) return;
     if (!cropType) {
       setError("Vui lòng chọn loại cây trồng trước khi phân tích");
+      return;
+    }
+    if (shouldSelectGrowthStage && !growthStage) {
+      setError("Vui lòng chọn giai đoạn sinh trưởng của cây");
       return;
     }
 
@@ -427,6 +465,7 @@ export default function DiagnosePage() {
     const fd = new FormData();
     fd.append("images", fileRef.current.files[0]); // Only send 1 image
     fd.append("cropType", cropType);
+    if (growthStage) fd.append("growthStage", growthStage);
 
     try {
       const res = await fetch("/api/diagnoses", { method: "POST", body: fd });
@@ -455,13 +494,18 @@ export default function DiagnosePage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-bold text-neutral-800">
-          📷 Chuẩn đoán bệnh cây
-        </h1>
-        <p className="mt-1 text-sm text-neutral-500">
-          Chụp hoặc chọn ảnh cây để AI phân tích
-        </p>
+      <div className="flex items-center gap-3">
+        <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-green-100 text-green-700">
+          <Camera className="h-5 w-5" aria-hidden="true" />
+        </span>
+        <div>
+          <h1 className="text-2xl font-bold text-neutral-800">
+            Chẩn đoán bệnh cây
+          </h1>
+          <p className="mt-1 text-sm text-neutral-500">
+            Chụp hoặc chọn ảnh cây để AI phân tích
+          </p>
+        </div>
       </div>
 
       {blockedTimeRemaining > 0 ? (
@@ -481,81 +525,182 @@ export default function DiagnosePage() {
           </p>
         </div>
       ) : (
-        <form onSubmit={handleSubmit} className="card flex flex-col gap-4">
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-neutral-700">
-              Chọn cây trồng cần chuẩn đoán
-            </label>
-            <select
-              value={cropType}
-              onChange={(e) => {
-                setCropType(e.target.value);
-                setPreviews([]);
-                if (fileRef.current) fileRef.current.value = "";
-              }}
-              className="input-field"
-            >
-              <option value="">-- Chọn cây trồng --</option>
-              {userCrops.map((c) => (
-                <option key={c.id} value={c.name}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Image drop zone */}
-          <div
-            onClick={() => cropType && fileRef.current?.click()}
-            className={`flex min-h-40 flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed transition ${
-              !cropType
-                ? "border-neutral-200 bg-neutral-50 cursor-not-allowed opacity-60"
-                : "border-green-300 bg-green-50 cursor-pointer hover:bg-green-100"
-            }`}
-          >
-            {previews.length > 0 ? (
-              <div className="flex flex-wrap gap-2 p-2">
-                {previews.map((p, i) => (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    key={i}
-                    src={p}
-                    alt=""
-                    className="h-24 w-24 rounded-lg object-cover"
-                  />
-                ))}
+        <form onSubmit={handleSubmit} className="card overflow-hidden p-0">
+          <div className="border-b border-neutral-100 bg-gradient-to-br from-green-50 via-white to-emerald-50/70 px-4 py-2">
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-green-600 text-white shadow-sm">
+                <Leaf className="h-5 w-5" aria-hidden="true" />
+              </span>
+              <div>
+                <h2 className="text-base font-bold text-neutral-900">
+                  Thông tin mẫu cây
+                </h2>
               </div>
-            ) : (
-              <>
-                <span className="text-3xl">🌿</span>
-                <span
-                  className={`text-sm font-medium ${!cropType ? "text-neutral-400" : "text-green-700"}`}
-                >
-                  {cropType
-                    ? "Nhấn để chụp hoặc chọn ảnh"
-                    : "Vui lòng chọn cây trước"}
-                </span>
-                <span className="text-xs text-neutral-400">Chỉ chọn 1 ảnh</span>
-              </>
-            )}
+            </div>
           </div>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => handleFiles(e.target.files)}
-          />
 
-          {error && <p className="text-sm text-red-500">{error}</p>}
+          <div className="flex flex-col gap-5 p-4 sm:p-5">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label className="mb-1.5 flex items-center gap-2 text-sm font-semibold text-neutral-700">
+                  <Sprout
+                    className="h-4 w-4 text-green-600"
+                    aria-hidden="true"
+                  />
+                  Cây trồng
+                </label>
+                <select
+                  value={cropType}
+                  onChange={(e) => {
+                    setCropType(e.target.value);
+                    setGrowthStage("");
+                    setPreviews([]);
+                    if (fileRef.current) fileRef.current.value = "";
+                  }}
+                  className="input-field"
+                >
+                  <option value="">Chọn cây trồng</option>
+                  {userCrops.map((c) => (
+                    <option key={c.id} value={c.name}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-          <button
-            type="submit"
-            className="btn-primary"
-            disabled={loading || !previews.length}
-          >
-            {loading ? "Đang phân tích..." : "🔍 Phân tích bệnh"}
-          </button>
+              <div>
+                <label className="mb-1.5 flex items-center gap-2 text-sm font-semibold text-neutral-700">
+                  <Leaf
+                    className="h-4 w-4 text-green-600"
+                    aria-hidden="true"
+                  />
+                  Giai đoạn sinh trưởng
+                </label>
+                <select
+                  value={growthStage}
+                  onChange={(e) => setGrowthStage(e.target.value)}
+                  disabled={!cropType || growthStageOptions.length === 0}
+                  className="input-field disabled:cursor-not-allowed disabled:bg-neutral-50 disabled:text-neutral-400"
+                >
+                  <option value="">
+                    {!cropType
+                      ? "Chọn cây trồng trước"
+                      : growthStageOptions.length === 0
+                        ? "Chưa có dữ liệu giai đoạn"
+                        : "Chọn giai đoạn"}
+                  </option>
+                  {growthStageOptions.map((stage) => (
+                    <option key={stage} value={stage}>
+                      {stage}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Image drop zone */}
+            <div>
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <label className="flex items-center gap-2 text-sm font-semibold text-neutral-700">
+                  <Camera
+                    className="h-4 w-4 text-green-600"
+                    aria-hidden="true"
+                  />
+                  Ảnh triệu chứng
+                </label>
+                <span className="rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-medium text-neutral-500">
+                  1 ảnh
+                </span>
+              </div>
+              <div
+                onClick={() => growthStage && fileRef.current?.click()}
+                className={`group flex min-h-48 flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed p-4 text-center transition ${
+                  !growthStage
+                    ? "cursor-not-allowed border-neutral-200 bg-neutral-50 opacity-70"
+                    : "cursor-pointer border-green-300 bg-green-50/60 hover:border-green-500 hover:bg-green-50"
+                }`}
+              >
+                {previews.length > 0 ? (
+                  <div className="flex w-full flex-col items-center gap-3">
+                    {previews.map((p, i) => (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        key={i}
+                        src={p}
+                        alt="Ảnh cây trồng đã chọn"
+                        className="h-36 w-full max-w-sm rounded-xl object-cover shadow-sm ring-1 ring-neutral-200"
+                      />
+                    ))}
+                    <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-green-700 shadow-sm ring-1 ring-green-100">
+                      <UploadCloud className="h-3.5 w-3.5" aria-hidden="true" />
+                      Nhấn để đổi ảnh
+                    </span>
+                  </div>
+                ) : (
+                  <>
+                    <span
+                      className={`flex h-14 w-14 items-center justify-center rounded-2xl ${
+                        growthStage
+                          ? "bg-white text-green-600 shadow-sm"
+                          : "bg-neutral-100 text-neutral-400"
+                      }`}
+                    >
+                      <ImagePlus className="h-7 w-7" aria-hidden="true" />
+                    </span>
+                    <span
+                      className={`text-sm font-semibold ${!growthStage ? "text-neutral-400" : "text-green-800"}`}
+                    >
+                      {growthStage
+                        ? "Nhấn để chụp hoặc chọn ảnh cây"
+                        : "Vui lòng chọn cây trồng trước"}
+                    </span>
+                    <span className="max-w-sm text-xs leading-relaxed text-neutral-400">
+                      Nên chụp rõ phần lá, thân, hoa hoặc trái đang có dấu
+                      hiệu bất thường.
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => handleFiles(e.target.files)}
+            />
+
+            {error && (
+              <p className="rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-sm font-medium text-red-600">
+                {error}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              className="btn-primary w-full py-3 text-base"
+              disabled={
+                loading ||
+                !previews.length ||
+                (shouldSelectGrowthStage && !growthStage)
+              }
+            >
+              {loading ? (
+                <div className="flex items-center gap-2">
+                  <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Đang phân tích ({analyzeCountdown}s)...
+                </div>
+              ) : (
+                <>
+                  <Search className="h-4 w-4" aria-hidden="true" />
+                  Phân tích bệnh
+                </>
+              )}
+            </button>
+          </div>
         </form>
       )}
 
@@ -656,122 +801,222 @@ export default function DiagnosePage() {
                 </div>
               </div>
 
-              {result.suggestions && result.suggestions.length > 0 && (
+              {( (result.suggestions && result.suggestions.length > 0) || result.rawAiResponse?.vfcSolutionText ) && (
                 <div className="mt-4">
                   <div className="flex items-center gap-2 mb-4">
                     <span className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100 text-green-600 text-base shadow-sm">
                       ✨
                     </span>
                     <h3 className="text-lg font-bold text-green-800">
-                      Sản phẩm khuyến dùng đặc trị
+                      Giải pháp VFC
                     </h3>
                   </div>
-                  <div className="flex flex-col gap-4">
-                    {result.suggestions.map((s) => {
-                      const isBestMatch = s.rank === 1;
-                      return (
-                        <div
-                          key={s.rank}
-                          className={`relative flex flex-col sm:flex-row gap-4 sm:gap-6 rounded-2xl p-5 shadow-sm transition-all duration-300 overflow-hidden ${
-                            isBestMatch
-                              ? "border-2 border-green-500 bg-gradient-to-br from-green-50/60 via-white to-green-100/30 hover:shadow-lg hover:border-green-600 scale-[1.01]"
-                              : "border border-neutral-200 bg-white hover:border-neutral-300 hover:shadow-md"
-                          }`}
-                        >
-                          {/* Cột trái: Hình ảnh */}
-                          <div
-                            className={`mx-auto sm:mx-0 flex-shrink-0 rounded-xl bg-white border border-neutral-100 p-2 ${
-                              isBestMatch ? "h-28 w-28" : "h-20 w-20"
-                            } flex items-center justify-center shadow-sm`}
+
+                  {result.rawAiResponse?.solutionSets && result.rawAiResponse.solutionSets.length > 0 ? (
+                    <div className="flex flex-col gap-6">
+                      {result.rawAiResponse.solutionSets.map((set, idx) => {
+                        const isBestCombo = idx === 0; // Combo đầu tiên là tối ưu nhất
+                        const matchedSuggestions = result.suggestions?.filter(s => 
+                          s.product && set.products.some((pName: string) => 
+                            s.product!.name.toLowerCase().includes(pName.toLowerCase()) || 
+                            pName.toLowerCase().includes(s.product!.name.toLowerCase())
+                          )
+                        ) || [];
+                        
+                        if (matchedSuggestions.length === 0) return null;
+                        
+                        return (
+                          <div 
+                            key={idx} 
+                            className={`relative rounded-2xl p-5 shadow-sm transition-all duration-300 overflow-hidden ${
+                              isBestCombo
+                                ? "border-2 border-green-500 bg-gradient-to-br from-green-50/60 via-white to-green-100/30 hover:shadow-lg hover:border-green-600 scale-[1.01]"
+                                : "border border-neutral-200 bg-white hover:border-neutral-300 hover:shadow-md"
+                            }`}
                           >
-                            {s.product?.imageUrls?.[0] ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img
-                                src={s.product.imageUrls[0]}
-                                alt={s.product.name}
-                                className="max-h-full max-w-full object-contain"
-                              />
-                            ) : (
-                              <div className="flex h-full w-full items-center justify-center rounded-lg bg-neutral-50 text-2xl">
-                                🧪
+                            {isBestCombo && (
+                              <div className="absolute top-0 right-0 rounded-bl-xl bg-green-600 px-3.5 py-1 text-[10px] font-extrabold uppercase tracking-wider text-white shadow-sm z-10">
+                                Combo Đề Xuất Tối Ưu
                               </div>
                             )}
-                          </div>
 
-                          {/* Cột phải: Thông tin */}
-                          <div className="flex-1 min-w-0 flex flex-col justify-between gap-3 text-center sm:text-left">
-                            <div>
-                              <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 flex-wrap justify-center sm:justify-start">
-                                <p
-                                  className={`font-black text-neutral-800 ${isBestMatch ? "text-lg sm:text-xl" : "text-base"}`}
-                                >
-                                  {s.product?.name ?? "Sản phẩm"}
-                                </p>
-                                {isBestMatch && (
-                                  <span className="inline-block mx-auto sm:mx-0 rounded-full bg-green-200/60 px-2.5 py-0.5 text-[10px] font-black text-green-800 uppercase tracking-wider">
-                                    Đề xuất tối ưu
-                                  </span>
-                                )}
-                              </div>
+                            <div className="flex items-center gap-2 mb-4">
+                              <h4 className={`font-black ${isBestCombo ? "text-green-800 text-lg sm:text-xl" : "text-neutral-800 text-base"}`}>
+                                {set.name}
+                              </h4>
+                            </div>
 
-                              {s.product?.price ? (
-                                <p
-                                  className={`font-black text-sm mt-1 ${isBestMatch ? "text-green-700" : "text-neutral-500"}`}
-                                >
-                                  Giá bán:{" "}
-                                  <span
-                                    className={
-                                      isBestMatch
-                                        ? "text-lg text-green-600"
-                                        : "text-neutral-700"
-                                    }
+                            <div className="flex flex-col gap-4 relative z-0">
+                              {matchedSuggestions.map((s) => {
+                                return (
+                                  <div
+                                    key={s.product?.id || s.rank}
+                                    className="flex flex-col sm:flex-row gap-4 bg-white/60 backdrop-blur-sm rounded-xl p-4 border border-neutral-100/80 shadow-sm"
                                   >
-                                    {new Intl.NumberFormat("vi-VN", {
-                                      style: "currency",
-                                      currency: "VND",
-                                    }).format(s.product.price)}
-                                  </span>
-                                </p>
+                                    <div className="mx-auto sm:mx-0 flex-shrink-0 h-24 w-24 rounded-xl bg-white border border-neutral-100 p-2 flex items-center justify-center shadow-sm">
+                                      {s.product?.imageUrls?.[0] ? (
+                                        <img
+                                          src={s.product.imageUrls[0]}
+                                          alt={s.product.name}
+                                          className="max-h-full max-w-full object-contain"
+                                        />
+                                      ) : (
+                                        <div className="flex h-full w-full items-center justify-center rounded-lg bg-neutral-50 text-2xl">
+                                          🧪
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    <div className="flex-1 min-w-0 flex flex-col justify-between gap-2 text-center sm:text-left">
+                                      <div>
+                                        <p className="font-bold text-neutral-800 text-base">
+                                          {s.product?.name ?? "Sản phẩm"}
+                                        </p>
+                                        {s.product?.price ? (
+                                          <p className="font-bold text-sm mt-1 text-green-700">
+                                            Giá bán:{" "}
+                                            <span className="text-neutral-700">
+                                              {new Intl.NumberFormat("vi-VN", {
+                                                style: "currency",
+                                                currency: "VND",
+                                              }).format(s.product.price)}
+                                            </span>
+                                          </p>
+                                        ) : (
+                                          <p className="text-xs text-neutral-400 mt-1">Liên hệ đại lý</p>
+                                        )}
+                                      </div>
+
+                                      <div className="rounded-xl p-2.5 text-left bg-neutral-50 border border-neutral-100">
+                                        <p className="text-sm leading-relaxed text-neutral-600">
+                                          {s.reason}
+                                        </p>
+                                      </div>
+                                      
+                                      {s.product && !loadingAgencies && agencies.length > 0 && canOrderRole && (
+                                        <div className="flex justify-center sm:justify-start mt-1">
+                                          <button
+                                            type="button"
+                                            onClick={() => handleOpenOrderModalFromProduct(s.product!)}
+                                            className="flex items-center gap-2 py-1.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-lg shadow-sm hover:shadow transition duration-200"
+                                          >
+                                            🛒 Mua lẻ
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-4">
+                      {result.suggestions?.map((s) => {
+                        const isBestMatch = s.rank === 1;
+                        return (
+                          <div
+                            key={s.rank}
+                            className={`relative flex flex-col sm:flex-row gap-4 sm:gap-6 rounded-2xl p-5 shadow-sm transition-all duration-300 overflow-hidden ${
+                              isBestMatch
+                                ? "border-2 border-green-500 bg-gradient-to-br from-green-50/60 via-white to-green-100/30 hover:shadow-lg hover:border-green-600 scale-[1.01]"
+                                : "border border-neutral-200 bg-white hover:border-neutral-300 hover:shadow-md"
+                            }`}
+                          >
+                            <div
+                              className={`mx-auto sm:mx-0 flex-shrink-0 rounded-xl bg-white border border-neutral-100 p-2 ${
+                                isBestMatch ? "h-28 w-28" : "h-20 w-20"
+                              } flex items-center justify-center shadow-sm`}
+                            >
+                              {s.product?.imageUrls?.[0] ? (
+                                <img
+                                  src={s.product.imageUrls[0]}
+                                  alt={s.product.name}
+                                  className="max-h-full max-w-full object-contain"
+                                />
                               ) : (
-                                <p className="text-xs text-neutral-400 mt-1">
-                                  Liên hệ đại lý
-                                </p>
+                                <div className="flex h-full w-full items-center justify-center rounded-lg bg-neutral-50 text-2xl">
+                                  🧪
+                                </div>
                               )}
                             </div>
 
-                            <div
-                              className={`rounded-xl p-3 text-left ${isBestMatch ? "bg-green-100/40 border border-green-200/30" : "bg-neutral-50 border border-neutral-100"}`}
-                            >
-                              <p
-                                className={`text-sm leading-relaxed ${isBestMatch ? "font-semibold text-green-900" : "text-neutral-600"}`}
+                            <div className="flex-1 min-w-0 flex flex-col justify-between gap-3 text-center sm:text-left">
+                              <div>
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 flex-wrap justify-center sm:justify-start">
+                                  <p
+                                    className={`font-black text-neutral-800 ${isBestMatch ? "text-lg sm:text-xl" : "text-base"}`}
+                                  >
+                                    {s.product?.name ?? "Sản phẩm"}
+                                  </p>
+                                  {isBestMatch && (
+                                    <span className="inline-block mx-auto sm:mx-0 rounded-full bg-green-200/60 px-2.5 py-0.5 text-[10px] font-black text-green-800 uppercase tracking-wider">
+                                      Đề xuất tối ưu
+                                    </span>
+                                  )}
+                                </div>
+
+                                {s.product?.price ? (
+                                  <p
+                                    className={`font-black text-sm mt-1 ${isBestMatch ? "text-green-700" : "text-neutral-500"}`}
+                                  >
+                                    Giá bán:{" "}
+                                    <span
+                                      className={
+                                        isBestMatch
+                                          ? "text-lg text-green-600"
+                                          : "text-neutral-700"
+                                      }
+                                    >
+                                      {new Intl.NumberFormat("vi-VN", {
+                                        style: "currency",
+                                        currency: "VND",
+                                      }).format(s.product.price)}
+                                    </span>
+                                  </p>
+                                ) : (
+                                  <p className="text-xs text-neutral-400 mt-1">
+                                    Liên hệ đại lý
+                                  </p>
+                                )}
+                              </div>
+
+                              <div
+                                className={`rounded-xl p-3 text-left ${isBestMatch ? "bg-green-100/40 border border-green-200/30" : "bg-neutral-50 border border-neutral-100"}`}
                               >
-                                {s.reason}
-                              </p>
+                                <p
+                                  className={`text-sm leading-relaxed ${isBestMatch ? "font-semibold text-green-900" : "text-neutral-600"}`}
+                                >
+                                  {s.reason}
+                                </p>
+                              </div>
+
+                              {s.product && !loadingAgencies && agencies.length > 0 && canOrderRole && (
+                                <div className="flex justify-center sm:justify-start mt-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenOrderModalFromProduct(s.product!)}
+                                    className="flex items-center gap-2 py-2 px-5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-sm hover:shadow transition duration-200"
+                                  >
+                                    🛒 Đặt hàng ngay
+                                  </button>
+                                </div>
+                              )}
                             </div>
 
-                            {s.product && !loadingAgencies && agencies.length > 0 && canOrderRole && (
-                              <div className="flex justify-center sm:justify-start mt-1">
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenOrderModalFromProduct(s.product!)}
-                                  className="flex items-center gap-2 py-2 px-5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-sm hover:shadow transition duration-200"
-                                >
-                                  🛒 Đặt hàng ngay
-                                </button>
+                            {isBestMatch && (
+                              <div className="absolute top-0 right-0 rounded-bl-xl bg-green-600 px-3.5 py-1 text-[10px] font-extrabold uppercase tracking-wider text-white shadow-sm">
+                                Phù hợp nhất
                               </div>
                             )}
                           </div>
-
-                          {/* Top Rank Badge */}
-                          {isBestMatch && (
-                            <div className="absolute top-0 right-0 rounded-bl-xl bg-green-600 px-3.5 py-1 text-[10px] font-extrabold uppercase tracking-wider text-white shadow-sm">
-                              Phù hợp nhất
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
 

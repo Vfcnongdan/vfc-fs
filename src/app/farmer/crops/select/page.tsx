@@ -6,6 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { getCropIcon } from "@/lib/cropIcons";
+import { useCropStore } from "@/store/useCropStore";
 
 interface Crop {
   id: string;
@@ -65,6 +66,7 @@ export default function SelectCropsPage() {
           toast.success("Thay đổi cây trồng đã được gửi và đang chờ duyệt.");
         } else if (data.applied) {
           toast.success("Thay đổi cây trồng đã được cập nhật.");
+          useCropStore.getState().fetchUserCrops(true);
         }
         router.push("/farmer");
         router.refresh();
