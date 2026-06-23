@@ -2,88 +2,23 @@
 
 import { useState, useEffect } from "react";
 
-interface UserPosition {
-  name: string;
-  zaloId: string;
-  lat: number;
-  lng: number;
-}
-
 export function ZaloFloatingButton() {
-  const [zaloLink, setZaloLink] = useState("https://zalo.me/your_oa_id");
-  const [closestUser, setClosestUser] = useState<string | null>(null);
+  const [zaloLink, setZaloLink] = useState<string | null>(null);
+  const [contactName, setContactName] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!navigator.geolocation) return;
-
-    navigator.geolocation.getCurrentPosition(async (position) => {
-      const { latitude, longitude } = position.coords;
-      console.log("Current user location:", { latitude, longitude });
-
-      try {
-        const res = await fetch("/api/staff");
-        if (!res.ok) return;
-
-        const data = await res.json();
-        const staffs: any[] = data.users || [];
-
-        let minDistance = Infinity;
-        let nearest: any = null;
-
-        staffs.forEach((u) => {
-          const uLat = u.lat;
-          const uLng = u.lng;
-          const uHasZalo = u.hasZalo;
-
-          if (!uLat || !uLng || !uHasZalo) return;
-          const d = getDistance(
-            latitude,
-            longitude,
-            Number(uLat),
-            Number(uLng),
-          );
-          if (d < minDistance) {
-            minDistance = d;
-            nearest = u;
-          }
-        });
-
-        console.log("Nearest staff candidate:", nearest);
-
-        if (nearest) {
-          // Lấy số Zalo cụ thể cho người này
-          const zaloRes = await fetch(
-            `/api/staff?action=getZaloAction&userHasZalo=${nearest.username}`,
-          );
-          if (zaloRes.ok) {
-            const zaloData = await zaloRes.json();
-            if (zaloData.success && zaloData.message) {
-              const zaloNumber = zaloData.message;
-              console.log("Fetched Zalo number:", zaloNumber);
-              setZaloLink(`https://zalo.me/${zaloNumber}`);
-              setClosestUser(nearest.name || "Nhân viên hỗ trợ");
-            }
-          }
+    fetch("/api/zalo-contact")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.phone) {
+          setZaloLink(`https://zalo.me/${data.phone}`);
+          setContactName(data.name ?? null);
         }
-      } catch (err) {
-        console.error("Failed to fetch nearest user:", err);
-      }
-    });
+      })
+      .catch(() => {});
   }, []);
 
-  function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
-    const R = 6371;
-    const dLat = ((lat2 - lat1) * Math.PI) / 180;
-    const dLon = ((lon2 - lon1) * Math.PI) / 180;
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos((lat1 * Math.PI) / 180) *
-        Math.cos((lat2 * Math.PI) / 180) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-  }
+  if (!zaloLink) return null;
 
   return (
     <div className="fixed bottom-20 right-4 z-50 sm:bottom-8 sm:right-8 flex items-center justify-center group">
@@ -104,13 +39,13 @@ export function ZaloFloatingButton() {
       `}</style>
 
       {/* Tooltip */}
-      {closestUser && (
+      {contactName && (
         <div className="absolute bottom-full mb-2 whitespace-nowrap rounded bg-black/80 px-2 py-1 text-[10px] text-white opacity-0 transition-opacity group-hover:opacity-100 pointer-events-none">
-          <span className="font-medium opacity-70">Gần bạn:</span> {closestUser}
+          <span className="font-medium opacity-70">Liên hệ:</span> {contactName}
           <div className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-black/80"></div>
         </div>
       )}
-      
+
       <a
         href={zaloLink}
         target="_blank"
