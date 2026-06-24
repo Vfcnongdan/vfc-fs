@@ -16,7 +16,6 @@ import {
   selectionTotal,
   type MultiSelectProduct,
 } from "@/components/ProductMultiSelect";
-import { cropGrowthStageOptions } from "@/lib/deseaseDetails";
 import { useCropStore } from "@/store/useCropStore";
 
 type AgencyCatalog = {
@@ -66,14 +65,24 @@ type DiagnosisResult = {
   }>;
 };
 
+type AwaitingStageInfo = {
+  diagnosisId: string;
+  availableStages: string[];
+  detectedGrowthStage?: string | null;
+};
+
+const ANALYSIS_PROGRESS_DURATION_MS = 90_000;
+const NEED_CLEARER_IMAGE_MESSAGE =
+  "Ảnh hiện tại chưa đủ rõ để hệ thống khoanh vùng chính xác. Bạn vui lòng chụp lại ảnh rõ hơn, gần vùng bệnh hơn và đủ ánh sáng nhé.";
+
 export default function DiagnosePage() {
   const fileRef = useRef<HTMLInputElement>(null);
+  const belowContentRef = useRef<HTMLDivElement>(null);
   const [previews, setPreviews] = useState<string[]>([]);
   const [cropType, setCropType] = useState("");
-  const [growthStage, setGrowthStage] = useState("");
   const { userCrops, fetchUserCrops } = useCropStore();
   const [loading, setLoading] = useState(false);
-  const [analyzeCountdown, setAnalyzeCountdown] = useState<number>(20);
+  const [analyzeProgress, setAnalyzeProgress] = useState<number>(0);
   const [result, setResult] = useState<DiagnosisResult | null>(null);
   const [error, setError] = useState("");
   const [blockedTimeRemaining, setBlockedTimeRemaining] = useState<number>(0);
@@ -90,6 +99,12 @@ export default function DiagnosePage() {
   const [orderSubmitting, setOrderSubmitting] = useState(false);
   const [orderError, setOrderError] = useState("");
   const preselectProductIdRef = useRef<string | null>(null);
+  /** Trạng thái chờ user chọn giai đoạn thủ công */
+  const [awaitingStage, setAwaitingStage] = useState<AwaitingStageInfo | null>(null);
+  const [stageConfirmationDeclined, setStageConfirmationDeclined] = useState(false);
+  const [stageConfirmCountdown, setStageConfirmCountdown] = useState(5);
+  /** Cache base64 ảnh để gửi lại khi user chọn giai đoạn */
+  const base64CacheRef = useRef<string[]>([]);
 
   const suggestionProductIds = useMemo(
     () =>
@@ -98,16 +113,6 @@ export default function DiagnosePage() {
         .filter((id): id is string => Boolean(id)) ?? [],
     [result?.suggestions],
   );
-
-  const growthStageOptions = useMemo(
-    () =>
-      cropGrowthStageOptions.find((item) => item.cropType === cropType)
-        ?.growthStages ?? [],
-    [cropType],
-  );
-
-  const shouldSelectGrowthStage = growthStageOptions.length > 0;
-  console.log('growthStageOptions', growthStageOptions)
 
   const defaultLineQty = Math.max(1, Math.ceil(parseFloat(farmArea) || 1));
 
@@ -189,6 +194,11 @@ export default function DiagnosePage() {
   }, [buildAgencyQuery, fetchFallbackAgencies]);
 
   const canOrderRole = ["FARMER", "AGENCY", "SUPER_AGENT"].includes(userProfile?.role ?? "");
+  const belowContentKey = awaitingStage
+    ? `stage-${awaitingStage.diagnosisId}`
+    : result
+      ? `result-${result.id}-${result.status}`
+      : "";
 
   useEffect(() => {
     if (result?.status === "DONE" && canOrderRole) {
@@ -387,13 +397,45 @@ export default function DiagnosePage() {
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (loading) {
-      setAnalyzeCountdown(20);
+      const startedAt = Date.now();
       interval = setInterval(() => {
-        setAnalyzeCountdown((prev) => (prev > 0 ? prev - 1 : 0));
-      }, 1000);
+        const elapsed = Date.now() - startedAt;
+        setAnalyzeProgress(
+          Math.min(100, Math.round((elapsed / ANALYSIS_PROGRESS_DURATION_MS) * 100))
+        );
+      }, 300);
     }
     return () => clearInterval(interval);
   }, [loading]);
+
+  useEffect(() => {
+    if (!belowContentKey) return;
+    window.setTimeout(() => {
+      belowContentRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 100);
+  }, [belowContentKey]);
+
+  useEffect(() => {
+    const detectedStage = awaitingStage?.detectedGrowthStage;
+    if (!detectedStage || stageConfirmationDeclined || loading) return;
+
+    const countdownId = window.setInterval(() => {
+      setStageConfirmCountdown((prev) => Math.max(0, prev - 1));
+    }, 1000);
+    const confirmId = window.setTimeout(() => {
+      handleSelectStage(detectedStage);
+    }, 30000);
+
+    return () => {
+      window.clearInterval(countdownId);
+      window.clearTimeout(confirmId);
+    };
+    // The timeout intentionally confirms the stage snapshot shown to the farmer.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [awaitingStage, stageConfirmationDeclined, loading]);
 
   function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
@@ -410,21 +452,15 @@ export default function DiagnosePage() {
       setError("Vui lòng chọn loại cây trồng trước khi phân tích");
       return;
     }
-    if (shouldSelectGrowthStage && !growthStage) {
-      setError("Vui lòng chọn giai đoạn sinh trưởng của cây");
-      return;
-    }
 
-    // Đọc thông tin rate limit từ localStorage
+    // Rate limit
     const now = new Date().getTime();
     const today = new Date().toDateString();
     const dataStr = localStorage.getItem("vfc_diagnose_rate_limit");
     let limitData = { triggers: [] as number[], blockedUntil: 0, penaltyCount: 0, lastActiveDate: today };
-    
     if (dataStr) {
       try {
         const parsed = JSON.parse(dataStr);
-        // Nếu phát hiện sang ngày mới, reset toàn bộ lịch sử vi phạm
         if (parsed.lastActiveDate && parsed.lastActiveDate !== today) {
           limitData = { triggers: [] as number[], blockedUntil: 0, penaltyCount: 0, lastActiveDate: today };
         } else {
@@ -434,49 +470,96 @@ export default function DiagnosePage() {
     } else {
       limitData.lastActiveDate = today;
     }
-
-    // Lọc bỏ các trigger cũ hơn 1 phút
     const oneMinuteAgo = now - 60000;
     const activeTriggers = (limitData.triggers || []).filter((t: number) => t > oneMinuteAgo);
-    
     activeTriggers.push(now);
     limitData.triggers = activeTriggers;
-
-    // Nếu số lần trigger vượt quá 3 lần trong 1 phút
     if (activeTriggers.length > 3) {
       const nextPenaltyCount = (limitData.penaltyCount || 0) + 1;
-      // Lũy tiến x10 lần thời gian phạt: Lần 1: 2m, Lần 2: 20m, Lần 3 trở đi: 200m (tối đa 200m)
       const penaltyMinutes = Math.min(200, 2 * Math.pow(10, nextPenaltyCount - 1));
       limitData.blockedUntil = now + penaltyMinutes * 60 * 1000;
       limitData.penaltyCount = nextPenaltyCount;
-      
       localStorage.setItem("vfc_diagnose_rate_limit", JSON.stringify(limitData));
       setBlockedTimeRemaining(penaltyMinutes * 60);
       setError(`Bạn đang thao tác quá nhanh. Vui lòng đợi trong ${penaltyMinutes} phút.`);
       return;
     }
-
     localStorage.setItem("vfc_diagnose_rate_limit", JSON.stringify(limitData));
 
     setError("");
+    setAnalyzeProgress(0);
     setLoading(true);
     setResult(null);
+    setAwaitingStage(null);
+    setStageConfirmationDeclined(false);
+    setStageConfirmCountdown(5);
+
+    // Cache base64 ảnh để gửi lại nếu cần chọn stage thủ công
+    const file = fileRef.current.files[0];
+    const arrayBuffer = await file.arrayBuffer();
+    const b64 = btoa(
+      new Uint8Array(arrayBuffer).reduce((d, b) => d + String.fromCharCode(b), "")
+    );
+    base64CacheRef.current = [b64];
 
     const fd = new FormData();
-    fd.append("images", fileRef.current.files[0]); // Only send 1 image
+    fd.append("images", file);
     fd.append("cropType", cropType);
-    if (growthStage) fd.append("growthStage", growthStage);
 
     try {
       const res = await fetch("/api/diagnoses", { method: "POST", body: fd });
       const data = await res.json();
+      console.log("[Diagnose API Response]", data);
       if (!res.ok) throw new Error(data.error);
 
-      // Poll for result
+      if (data.awaitingStage) {
+        console.log("[Diagnose API] Awaiting stage, setting UI...");
+        setStageConfirmationDeclined(false);
+        setStageConfirmCountdown(5);
+        setAwaitingStage({
+          diagnosisId: data.id,
+          availableStages: data.availableStages ?? [],
+          detectedGrowthStage: data.detectedGrowthStage ?? null,
+        });
+        setResult({ id: data.id, status: "PROCESSING" });
+        setLoading(false);
+        return;
+      }
+
+      // AI detect được hoặc crop không có stages → poll bình thường
       setResult({ id: data.id, status: "PROCESSING" });
       await pollResult(data.id);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Có lỗi xảy ra");
+      setError(err instanceof Error ? err.message : NEED_CLEARER_IMAGE_MESSAGE);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSelectStage(stage: string) {
+    if (!awaitingStage) return;
+    setAwaitingStage(null);
+    setStageConfirmationDeclined(false);
+    setAnalyzeProgress(0);
+    setLoading(true);
+    setError("");
+
+    try {
+      const res = await fetch(`/api/diagnoses/${awaitingStage.diagnosisId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          growthStage: stage,
+          base64Images: base64CacheRef.current,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      setResult({ id: awaitingStage.diagnosisId, status: "PROCESSING" });
+      await pollResult(awaitingStage.diagnosisId);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : NEED_CLEARER_IMAGE_MESSAGE);
     } finally {
       setLoading(false);
     }
@@ -540,62 +623,29 @@ export default function DiagnosePage() {
           </div>
 
           <div className="flex flex-col gap-5 p-4 sm:p-5">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div>
-                <label className="mb-1.5 flex items-center gap-2 text-sm font-semibold text-neutral-700">
-                  <Sprout
-                    className="h-4 w-4 text-green-600"
-                    aria-hidden="true"
-                  />
-                  Cây trồng
-                </label>
-                <select
-                  value={cropType}
-                  onChange={(e) => {
-                    setCropType(e.target.value);
-                    setGrowthStage("");
-                    setPreviews([]);
-                    if (fileRef.current) fileRef.current.value = "";
-                  }}
-                  className="input-field"
-                >
-                  <option value="">Chọn cây trồng</option>
-                  {userCrops.map((c) => (
-                    <option key={c.id} value={c.name}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="mb-1.5 flex items-center gap-2 text-sm font-semibold text-neutral-700">
-                  <Leaf
-                    className="h-4 w-4 text-green-600"
-                    aria-hidden="true"
-                  />
-                  Giai đoạn sinh trưởng
-                </label>
-                <select
-                  value={growthStage}
-                  onChange={(e) => setGrowthStage(e.target.value)}
-                  disabled={!cropType || growthStageOptions.length === 0}
-                  className="input-field disabled:cursor-not-allowed disabled:bg-neutral-50 disabled:text-neutral-400"
-                >
-                  <option value="">
-                    {!cropType
-                      ? "Chọn cây trồng trước"
-                      : growthStageOptions.length === 0
-                        ? "Chưa có dữ liệu giai đoạn"
-                        : "Chọn giai đoạn"}
+            <div>
+              <label className="mb-1.5 flex items-center gap-2 text-sm font-semibold text-neutral-700">
+                <Sprout className="h-4 w-4 text-green-600" aria-hidden="true" />
+                Cây trồng
+              </label>
+              <select
+                value={cropType}
+                onChange={(e) => {
+                  setCropType(e.target.value);
+                  setPreviews([]);
+                  setResult(null);
+                  setAwaitingStage(null);
+                  if (fileRef.current) fileRef.current.value = "";
+                }}
+                className="input-field"
+              >
+                <option value="">Chọn cây trồng</option>
+                {userCrops.map((c) => (
+                  <option key={c.id} value={c.name}>
+                    {c.name}
                   </option>
-                  {growthStageOptions.map((stage) => (
-                    <option key={stage} value={stage}>
-                      {stage}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                ))}
+              </select>
             </div>
 
             {/* Image drop zone */}
@@ -613,9 +663,9 @@ export default function DiagnosePage() {
                 </span>
               </div>
               <div
-                onClick={() => growthStage && fileRef.current?.click()}
+                onClick={() => cropType && fileRef.current?.click()}
                 className={`group flex min-h-48 flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed p-4 text-center transition ${
-                  !growthStage
+                  !cropType
                     ? "cursor-not-allowed border-neutral-200 bg-neutral-50 opacity-70"
                     : "cursor-pointer border-green-300 bg-green-50/60 hover:border-green-500 hover:bg-green-50"
                 }`}
@@ -640,7 +690,7 @@ export default function DiagnosePage() {
                   <>
                     <span
                       className={`flex h-14 w-14 items-center justify-center rounded-2xl ${
-                        growthStage
+                        cropType
                           ? "bg-white text-green-600 shadow-sm"
                           : "bg-neutral-100 text-neutral-400"
                       }`}
@@ -648,9 +698,9 @@ export default function DiagnosePage() {
                       <ImagePlus className="h-7 w-7" aria-hidden="true" />
                     </span>
                     <span
-                      className={`text-sm font-semibold ${!growthStage ? "text-neutral-400" : "text-green-800"}`}
+                      className={`text-sm font-semibold ${!cropType ? "text-neutral-400" : "text-green-800"}`}
                     >
-                      {growthStage
+                      {cropType
                         ? "Nhấn để chụp hoặc chọn ảnh cây"
                         : "Vui lòng chọn cây trồng trước"}
                     </span>
@@ -678,35 +728,107 @@ export default function DiagnosePage() {
 
             <button
               type="submit"
-              className="btn-primary w-full py-3 text-base"
-              disabled={
-                loading ||
-                !previews.length ||
-                (shouldSelectGrowthStage && !growthStage)
-              }
+              className="btn-primary relative w-full overflow-hidden py-3 text-base"
+              disabled={loading || !previews.length}
             >
+              {loading && (
+                <span
+                  className="absolute inset-y-0 left-0 bg-white/20 transition-[width] duration-300 ease-linear"
+                  style={{ width: `${analyzeProgress}%` }}
+                  aria-hidden="true"
+                />
+              )}
               {loading ? (
-                <div className="flex items-center gap-2">
+                <div className="relative z-10 flex items-center gap-2">
                   <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  Đang phân tích ({analyzeCountdown}s)...
+                  {analyzeProgress >= 100
+                    ? "AI cần thêm chút thời gian, bạn chờ thêm nhé"
+                    : `Đang phân tích ${analyzeProgress}%`}
                 </div>
               ) : (
-                <>
+                <span className="relative z-10 flex items-center gap-2">
                   <Search className="h-4 w-4" aria-hidden="true" />
                   Phân tích bệnh
-                </>
+                </span>
               )}
             </button>
           </div>
         </form>
       )}
 
-      {/* Result */}
-      {result && (
-        <div className="card flex flex-col gap-4">
+      {(awaitingStage || result) && (
+        <div ref={belowContentRef} className="scroll-mt-6">
+          {/* Awaiting Stage — user chọn giai đoạn thủ công */}
+          {awaitingStage && (
+            <div className="card flex flex-col gap-4 border-2 border-amber-300 bg-amber-50/30 animate-fade-in">
+              <div className="flex items-center gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-600 text-xl">
+                  🌱
+                </span>
+                <div>
+                  <h3 className="font-bold text-neutral-800 text-base">
+                    Xác nhận giai đoạn sinh trưởng
+                  </h3>
+                  <p className="text-xs text-neutral-500 mt-0.5">
+                    Giai đoạn giúp hệ thống đối chiếu bệnh chính xác hơn.
+                  </p>
+                </div>
+              </div>
+
+              {awaitingStage.detectedGrowthStage && !stageConfirmationDeclined ? (
+                <div className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-white/80 p-4">
+                  <p className="text-sm font-semibold text-neutral-800">
+                    Cây của bạn đang trong giai đoạn{" "}
+                    <span className="text-amber-700">
+                      {awaitingStage.detectedGrowthStage}
+                    </span>
+                    ?
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleSelectStage(awaitingStage.detectedGrowthStage!)}
+                      className="rounded-xl bg-amber-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-amber-700"
+                    >
+                      Có, tiếp tục ({stageConfirmCountdown}s)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStageConfirmationDeclined(true)}
+                      className="rounded-xl border border-amber-300 bg-white px-4 py-2 text-sm font-semibold text-amber-800 transition hover:bg-amber-50"
+                    >
+                      Không
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <p className="text-xs font-medium text-neutral-500">
+                    Bạn hãy chọn giai đoạn hiện tại của cây:
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {awaitingStage.availableStages.map((stage) => (
+                      <button
+                        key={stage}
+                        type="button"
+                        onClick={() => handleSelectStage(stage)}
+                        className="rounded-full border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-800 shadow-sm transition hover:border-amber-500 hover:bg-amber-50 hover:shadow active:scale-95"
+                      >
+                        {stage}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Result */}
+          {result && !awaitingStage && (
+            <div className="card flex flex-col gap-4">
           <div className="flex items-center gap-2">
             <span className="font-semibold">Kết quả</span>
             <span
@@ -742,6 +864,12 @@ export default function DiagnosePage() {
                 phẩm của VFC. Quá trình này mất khoảng 5 - 10 giây, vui lòng
                 không tắt trình duyệt.
               </p>
+            </div>
+          )}
+
+          {result.status === "FAILED" && (
+            <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium leading-relaxed text-red-700">
+              {result.summary || NEED_CLEARER_IMAGE_MESSAGE}
             </div>
           )}
 
@@ -1074,6 +1202,8 @@ export default function DiagnosePage() {
               </div>
               )}
             </>
+          )}
+            </div>
           )}
         </div>
       )}
