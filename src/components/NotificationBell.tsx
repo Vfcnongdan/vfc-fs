@@ -37,7 +37,6 @@ export function NotificationBell({ dark = false }: { dark?: boolean }) {
   async function loadNotifications() {
     const res = await fetch("/api/notifications");
     if (!res.ok) return;
-
     const data = (await res.json()) as NotificationResponse;
     setUnreadCount(data.unreadCount ?? 0);
     setNotifications(data.notifications ?? []);
@@ -56,7 +55,6 @@ export function NotificationBell({ dark = false }: { dark?: boolean }) {
     function closeOnOutsideClick(event: MouseEvent) {
       if (!wrapperRef.current?.contains(event.target as Node)) setOpen(false);
     }
-
     document.addEventListener("mousedown", closeOnOutsideClick);
     return () => document.removeEventListener("mousedown", closeOnOutsideClick);
   }, []);
@@ -71,7 +69,6 @@ export function NotificationBell({ dark = false }: { dark?: boolean }) {
       );
       setUnreadCount((count) => Math.max(0, count - 1));
     }
-
     await fetch(`/api/notifications/${notification.id}`, { method: "PATCH" }).catch(() => {});
   }
 
@@ -80,7 +77,7 @@ export function NotificationBell({ dark = false }: { dark?: boolean }) {
       <button
         type="button"
         aria-label="Thông báo"
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => setOpen((v) => !v)}
         className={`relative inline-flex h-10 w-10 items-center justify-center rounded-full border transition ${
           dark
             ? "border-white/20 bg-white/10 text-white hover:bg-white/15"
@@ -96,7 +93,7 @@ export function NotificationBell({ dark = false }: { dark?: boolean }) {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-12 z-50 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-xl">
+        <div className="fixed inset-x-0 top-16 z-50 overflow-hidden border-b border-neutral-200 bg-white shadow-xl sm:absolute sm:inset-x-auto sm:right-0 sm:top-12 sm:w-[22rem] sm:rounded-lg sm:border">
           <div className="flex items-center justify-between border-b border-neutral-100 px-4 py-3">
             <h2 className="text-sm font-semibold text-neutral-800">Thông báo</h2>
             <span className="text-xs text-neutral-400">{unreadCount} chưa đọc</span>

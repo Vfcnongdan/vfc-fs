@@ -8,6 +8,7 @@ export type OrderCatalogItem = {
   slug: string;
   stock: number;
   unit: string;
+  imageUrls: string[];
 };
 
 export type AgencyOrderCatalog = {
@@ -50,6 +51,7 @@ export async function getAgencyOrderCatalog(
       name: true,
       slug: true,
       unit: true,
+      imageUrls: true,
       detail: {
         select: { id: true },
       },
@@ -68,6 +70,7 @@ export async function getAgencyOrderCatalog(
       slug: product.slug,
       stock: 0,
       unit: product.unit,
+      imageUrls: product.imageUrls,
     };
 
     if (suggestionSet.has(product.id)) {

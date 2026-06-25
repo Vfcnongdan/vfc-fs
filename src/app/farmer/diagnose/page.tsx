@@ -67,6 +67,48 @@ const ANALYSIS_PROGRESS_DURATION_MS = 90_000;
 const NEED_CLEARER_IMAGE_MESSAGE =
   "Ảnh hiện tại chưa đủ rõ để hệ thống khoanh vùng chính xác. Bạn vui lòng chụp lại ảnh rõ hơn, gần vùng bệnh hơn và đủ ánh sáng nhé.";
 
+function ExpertContactBanner() {
+  const [zaloLink, setZaloLink] = useState<string | null>(null);
+  const [contactName, setContactName] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/zalo-contact")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.phone) {
+          setZaloLink(`https://zalo.me/${data.phone}`);
+          setContactName(data.name ?? null);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  if (!zaloLink) return null;
+
+  return (
+    <a
+      href={zaloLink}
+      target="_blank"
+      rel="noreferrer"
+      className="group flex items-center gap-4 rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50 to-sky-50 px-4 py-3.5 shadow-sm transition hover:border-blue-400 hover:shadow-md active:scale-[0.99]"
+    >
+      <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-600 shadow">
+        <div className="absolute inset-0 animate-ping rounded-full bg-blue-400 opacity-30" />
+        <span className="relative text-lg">💬</span>
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-bold text-blue-800">Liên hệ chuyên gia cây trồng VFC</p>
+        <p className="mt-0.5 truncate text-xs text-blue-600/80">
+          {contactName ? `Gặp ${contactName} qua Zalo` : "Tư vấn trực tiếp qua Zalo"}
+        </p>
+      </div>
+      <svg className="h-4 w-4 shrink-0 text-blue-400 transition group-hover:translate-x-0.5 group-hover:text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+      </svg>
+    </a>
+  );
+}
+
 export default function DiagnosePage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const belowContentRef = useRef<HTMLDivElement>(null);
@@ -89,12 +131,12 @@ export default function DiagnosePage() {
   const base64CacheRef = useRef<string[]>([]);
 
   // Combo order modal state
-  const [orderModalSet, setOrderModalSet] = useState<{ name: string; products: { id: string; name: string; productDetailId?: string }[] } | null>(null);
+  const [orderModalSet, setOrderModalSet] = useState<{ name: string; products: { id: string; name: string; imageUrls?: string[]; productDetailId?: string }[] } | null>(null);
   const [selectedAgencyId, setSelectedAgencyId] = useState<string>("");
   const [orderFarmArea, setOrderFarmArea] = useState<string>("1.0");
   const [additionalSelected, setAdditionalSelected] = useState<Map<string, number>>(new Map());
   const [additionalProducts, setAdditionalProducts] = useState<MultiSelectProduct[]>([]);
-  const [suggestedFromCatalog, setSuggestedFromCatalog] = useState<{ id: string; name: string; productDetailId: string }[]>([]);
+  const [suggestedFromCatalog, setSuggestedFromCatalog] = useState<{ id: string; name: string; imageUrls: string[]; productDetailId: string }[]>([]);
   const [loadingCatalog, setLoadingCatalog] = useState(false);
   const [orderSubmitting, setOrderSubmitting] = useState(false);
   const [orderError, setOrderError] = useState("");
@@ -209,10 +251,11 @@ export default function DiagnosePage() {
           setSuggestedFromCatalog(
             (data.suggested ?? [])
               .filter((s: { productDetailId: string }) => s.productDetailId)
-              .map((s: { productId: string; name: string; productDetailId: string }) => ({
+              .map((s: { productId: string; name: string; productDetailId: string; imageUrls?: string[] }) => ({
                 id: s.productId,
                 name: s.name,
                 productDetailId: s.productDetailId,
+                imageUrls: s.imageUrls ?? [],
               })),
           );
         } else {
@@ -894,6 +937,8 @@ export default function DiagnosePage() {
                 </div>
               </div>
 
+              <ExpertContactBanner />
+
               {( (result.suggestions && result.suggestions.length > 0) || result.rawAiResponse?.vfcSolutionText ) && (
                 <div className="mt-4">
                   <div className="flex items-center gap-2 mb-4">
@@ -985,7 +1030,7 @@ export default function DiagnosePage() {
                                   name: set.name,
                                   products: matchedSuggestions
                                     .filter((s) => s.product)
-                                    .map((s) => ({ id: s.product!.id, name: s.product!.name })),
+                                    .map((s) => ({ id: s.product!.id, name: s.product!.name, imageUrls: s.product!.imageUrls })),
                                 })}
                                 className="mt-4 w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-sm hover:shadow transition duration-200"
                               >
@@ -1070,7 +1115,7 @@ export default function DiagnosePage() {
                             name: "Giải pháp đề xuất",
                             products: result.suggestions!
                               .filter((s) => s.product)
-                              .map((s) => ({ id: s.product!.id, name: s.product!.name })),
+                              .map((s) => ({ id: s.product!.id, name: s.product!.name, imageUrls: s.product!.imageUrls })),
                           })}
                           className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-sm hover:shadow transition duration-200"
                         >
@@ -1162,13 +1207,24 @@ export default function DiagnosePage() {
                 <label className="mb-2 block text-xs font-bold text-neutral-500 uppercase tracking-wider">
                   Sản phẩm combo ({comboDefaultQty} / SP)
                 </label>
-                <div className="rounded-xl border border-neutral-200 divide-y divide-neutral-100">
-                  {orderModalSet.products.map((p) => (
-                    <div key={p.id} className="flex items-center justify-between px-3 py-2.5">
-                      <span className="text-sm font-medium text-neutral-800">{p.name}</span>
-                      <span className="text-sm font-bold text-neutral-600">x{comboDefaultQty}</span>
-                    </div>
-                  ))}
+                <div className="rounded-xl border border-neutral-200 divide-y divide-neutral-100 overflow-hidden">
+                  {orderModalSet.products.map((p) => {
+                    const img = p.imageUrls?.[0];
+                    return (
+                      <div key={p.id} className="flex items-center gap-3 px-3 py-2.5">
+                        <div className="h-10 w-10 shrink-0 rounded-lg border border-neutral-100 bg-neutral-50 p-1 flex items-center justify-center overflow-hidden">
+                          {img ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={img} alt={p.name} className="max-h-full max-w-full object-contain" />
+                          ) : (
+                            <span className="text-lg">🧪</span>
+                          )}
+                        </div>
+                        <span className="flex-1 min-w-0 text-sm font-medium text-neutral-800 truncate">{p.name}</span>
+                        <span className="shrink-0 text-sm font-bold text-neutral-600">×{comboDefaultQty}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 

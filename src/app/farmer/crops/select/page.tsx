@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import toast from "react-hot-toast";
-import { getCropIcon } from "@/lib/cropIcons";
+import { getCropImagePath } from "@/lib/cropIcons";
 import { useCropStore } from "@/store/useCropStore";
 
 interface Crop {
@@ -148,16 +148,18 @@ export default function SelectCropsPage() {
                 className="flex flex-col items-center gap-2 group"
               >
                 <div
-                  className={`relative w-10 h-10 rounded-full overflow-hidden transition-all flex items-center justify-center ${
+                  className={`relative w-16 h-16 rounded-full overflow-hidden transition-all ${
                     selectedIds.includes(crop.id)
                       ? "ring-2 ring-[#FFD680]"
                       : "ring-1 ring-white/20"
                   }`}
-                  style={{ backgroundColor: getCropIcon(crop.cropCode).bg + "cc" }}
                 >
-                  <span className="text-2xl leading-none select-none">
-                    {getCropIcon(crop.cropCode).emoji}
-                  </span>
+                  <Image
+                    src={getCropImagePath(crop.cropCode)}
+                    alt={crop.name}
+                    fill
+                    className="object-cover"
+                  />
                   {selectedIds.includes(crop.id) && (
                     <div className="absolute inset-0 bg-green-500/40 flex items-center justify-center">
                       <div className="bg-green-500 rounded-full p-0.5 shadow-lg">
