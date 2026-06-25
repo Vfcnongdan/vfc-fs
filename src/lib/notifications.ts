@@ -17,8 +17,48 @@ type RelatedOrder = {
   status: OrderStatus;
 };
 
-function relatedRecipientIds(order: Pick<RelatedOrder, "buyerId" | "sellerId">) {
-  return Array.from(new Set([order.buyerId, order.sellerId].filter(Boolean)));
+async function resolveMdoUserId(buyerId: string): Promise<string | null> {
+  const farmer = await prisma.farmer.findFirst({
+    where: { userId: buyerId },
+    select: { mdo: true },
+  });
+  if (!farmer?.mdo) return null;
+  const mdo = await prisma.mdo.findFirst({
+    where: {
+      OR: [
+        { name: { equals: farmer.mdo, mode: "insensitive" } },
+        { employeeCode: { equals: farmer.mdo, mode: "insensitive" } },
+      ],
+    },
+    select: { userId: true },
+  });
+  return mdo?.userId ?? null;
+}
+
+async function resolveSeUserId(sellerId: string): Promise<string | null> {
+  const agency = await prisma.agency.findFirst({
+    where: { userId: sellerId },
+    select: { salesman: true },
+  });
+  if (!agency?.salesman) return null;
+  const se = await prisma.se.findFirst({
+    where: {
+      OR: [
+        { name: { equals: agency.salesman, mode: "insensitive" } },
+        { employeeCode: { equals: agency.salesman, mode: "insensitive" } },
+      ],
+    },
+    select: { userId: true },
+  });
+  return se?.userId ?? null;
+}
+
+async function relatedRecipientIds(order: Pick<RelatedOrder, "buyerId" | "sellerId">): Promise<string[]> {
+  const [mdoUserId, seUserId] = await Promise.all([
+    resolveMdoUserId(order.buyerId),
+    resolveSeUserId(order.sellerId),
+  ]);
+  return Array.from(new Set([order.buyerId, order.sellerId, mdoUserId, seUserId].filter((id): id is string => Boolean(id))));
 }
 
 function shortOrderNumber(orderNumber: string) {
@@ -27,7 +67,7 @@ function shortOrderNumber(orderNumber: string) {
 
 export async function notifyOrderCreated(order: RelatedOrder) {
   const orderCode = shortOrderNumber(order.orderNumber);
-  const recipients = relatedRecipientIds(order);
+  const recipients = await relatedRecipientIds(order);
   if (recipients.length === 0) return;
 
   await prisma.notification.createMany({
@@ -48,7 +88,7 @@ export async function notifyOrderStatusChanged(
   if (order.status === previousStatus) return;
 
   const orderCode = shortOrderNumber(order.orderNumber);
-  const recipients = relatedRecipientIds(order);
+  const recipients = await relatedRecipientIds(order);
   if (recipients.length === 0) return;
 
   await prisma.notification.createMany({
@@ -82,8 +122,8 @@ export function notificationHrefForRole(
   }
   if (!orderId) return `/farmer`;
   if (role === "FARMER") return `/farmer/orders/${orderId}`;
-  if (role === "AGENCY" || role === "SUPER_AGENT") {
-    return `/agent/orders?orderId=${orderId}`;
+  if (role === "AGENCY" || role === "SUPER_AGENT" || role === "MDO" || role === "SE") {
+    return `/admin/orders?orderId=${orderId}`;
   }
-  return `/sale/orders`;
+  return `/admin/orders?orderId=${orderId}`;
 }

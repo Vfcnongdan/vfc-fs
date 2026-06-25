@@ -6,7 +6,6 @@ import Link from "next/link";
 type Product = {
   id: string;
   name: string;
-  price: string;
   imageUrls: string[];
   unit: string;
   category?: { name: string };
@@ -56,10 +55,6 @@ export default function ProductsPage() {
               <div className="flex flex-col gap-0.5">
                 <span className="text-xs font-medium text-green-600 uppercase tracking-wider">{p.category?.name ?? "VFC"}</span>
                 <h3 className="text-sm font-bold text-neutral-800 line-clamp-2 leading-tight min-h-[2.5rem]">{p.name}</h3>
-                <div className="mt-1 flex items-baseline gap-1">
-                  <span className="text-sm font-bold text-neutral-900">{Number(p.price).toLocaleString()}đ</span>
-                  <span className="text-[10px] text-neutral-400">/ {p.unit}</span>
-                </div>
               </div>
               <button className="btn-primary w-full py-2 text-xs">Thêm vào đơn</button>
             </div>

@@ -2,8 +2,8 @@
 
 export type MultiSelectProduct = {
   productId: string;
+  productDetailId: string;
   name: string;
-  price: number;
   stock: number;
   unit: string;
 };
@@ -76,13 +76,6 @@ export function ProductMultiSelect({
               <div className="flex justify-between flex-1 min-w-0">
                 <div>
                   <p className="text-sm font-semibold text-neutral-800 leading-tight">{p.name}</p>
-                  <p className="text-[10px] text-neutral-500 mt-0.5">
-                    {new Intl.NumberFormat("vi-VN", {
-                      style: "currency",
-                      currency: "VND",
-                    }).format(p.price)}
-                    /{p.unit}
-                  </p>
                 </div>
                 {checked && (
                   <div className="flex items-center gap-2 mt-2">
@@ -96,7 +89,7 @@ export function ProductMultiSelect({
                         onChange={(e) => setQty(p.productId, e.target.value)}
                         className="w-24 rounded-lg border border-neutral-200 pl-2 pr-8 py-1 text-sm font-semibold"
                       />
-                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-neutral-400">ha</span>
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-neutral-400">{p.unit}</span>
                     </div>
                   </div>
                 )}
@@ -107,18 +100,6 @@ export function ProductMultiSelect({
       </div>
     </div>
   );
-}
-
-export function selectionTotal(
-  products: MultiSelectProduct[],
-  selected: Map<string, number>,
-): number {
-  let total = 0;
-  for (const p of products) {
-    const qty = selected.get(p.productId);
-    if (qty) total += p.price * qty;
-  }
-  return total;
 }
 
 export function mergeSelections(

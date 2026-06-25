@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
     data: {
       buyerId: user.id,
       sellerId: sellerResult.sellerId,
-      totalAmount: lineResult.totalAmount,
+      totalAmount: 0,
       note,
       deliveryAddr,
       items: { create: lineResult.items },

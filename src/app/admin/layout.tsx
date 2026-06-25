@@ -22,11 +22,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       .catch(() => {});
   }, []);
 
+  const canSeeOrders = user?.role === "ADMIN" || user?.role === "AGENCY" || user?.role === "SUPER_AGENT" || user?.role === "MDO" || user?.role === "SE";
+  const isAdminOnly = user?.role === "ADMIN";
+
   const menuItems = [
-    { href: "/admin", icon: "📈", label: "Tổng quan", alwaysShow: true },
-    { href: "/admin/products", icon: "📦", label: "Sản phẩm", alwaysShow: false },
-    { href: "/admin/system/users", icon: "👤", label: "Người dùng", alwaysShow: false },
-  ].filter(item => item.alwaysShow || user?.role === "ADMIN");
+    { href: "/admin", icon: "📈", label: "Tổng quan", show: true },
+    { href: "/admin/orders", icon: "🛒", label: "Quản lý đơn hàng", show: canSeeOrders },
+    { href: "/admin/products", icon: "📦", label: "Sản phẩm", show: isAdminOnly },
+    { href: "/admin/system/users", icon: "👤", label: "Người dùng", show: isAdminOnly },
+  ].filter(item => item.show);
 
   const sidebarContent = (
     <aside className={`flex h-full flex-col bg-[#064E3B] shadow-2xl transition-all duration-300 ${isSidebarOpen ? "w-64" : "w-0 sm:w-64 overflow-hidden"}`}>

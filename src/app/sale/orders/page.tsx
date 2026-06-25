@@ -6,7 +6,6 @@ type B2cOrder = {
   id: string;
   orderNumber: string;
   status: string;
-  totalAmount: string;
   createdAt: string;
   buyer: { phone: string; name: string | null };
   seller: { name: string | null; agency?: { name: string } | null };
@@ -47,7 +46,6 @@ export default function SaleOrdersPage() {
               <th className="px-4 py-3 font-semibold">Đơn hàng</th>
               <th className="px-4 py-3 font-semibold">Nông dân</th>
               <th className="px-4 py-3 font-semibold">Đại lý</th>
-              <th className="px-4 py-3 font-semibold">Tổng tiền</th>
               <th className="px-4 py-3 font-semibold">Trạng thái</th>
               <th className="px-4 py-3 font-semibold text-right">Thao tác</th>
             </tr>
@@ -71,9 +69,6 @@ export default function SaleOrdersPage() {
                   </td>
                   <td className="px-4 py-4 text-neutral-600">
                     {order.seller.agency?.name ?? order.seller.name ?? "—"}
-                  </td>
-                  <td className="px-4 py-4 font-semibold text-green-700">
-                    {Number(order.totalAmount).toLocaleString()}đ
                   </td>
                   <td className="px-4 py-4">
                     <span

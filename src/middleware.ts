@@ -5,6 +5,9 @@ import { verifyToken, COOKIE_NAME, Role } from "@/lib/auth";
 const PUBLIC_PATHS = ["/", "/assets", "/api/auth/otp/send", "/api/auth/otp/verify"];
 const ROLE_PATHS: Record<string, Role[]> = {
   "/api/admin": [Role.ADMIN],
+  "/admin/orders": [Role.ADMIN, Role.AGENCY, Role.SUPER_AGENT, Role.MDO, Role.SE],
+  "/admin/products": [Role.ADMIN],
+  "/admin/system": [Role.ADMIN],
   "/sale": [Role.SALE, Role.ADMIN],
   "/api/sale": [Role.SALE, Role.ADMIN],
   "/agent": [Role.SUPER_AGENT, Role.AGENCY, Role.ADMIN],

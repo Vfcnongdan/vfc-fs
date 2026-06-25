@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
       suggestions: {
         include: {
           product: {
-            select: { id: true, name: true, imageUrls: true, slug: true, price: true },
+            select: { id: true, name: true, imageUrls: true, slug: true },
           },
         },
         orderBy: { rank: "asc" },
@@ -161,7 +161,7 @@ export async function GET(request: NextRequest) {
         suggestions: {
           include: {
             product: {
-              select: { id: true, name: true, imageUrls: true, slug: true, price: true },
+              select: { id: true, name: true, imageUrls: true, slug: true },
             },
           },
           orderBy: { rank: "asc" },

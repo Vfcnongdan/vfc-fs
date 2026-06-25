@@ -8,7 +8,6 @@ interface Product {
   sku: string;
   name: string;
   slug: string;
-  price: number;
   stock: number;
   isActive: boolean;
   unit: string;
@@ -99,7 +98,7 @@ export default function AdminProductsPage() {
         </div>
         <button
           onClick={() => {
-            setEditingProduct({ name: "", sku: "", slug: "", price: 0, unit: "chai", stock: 0, isActive: true });
+            setEditingProduct({ name: "", sku: "", slug: "", unit: "chai", stock: 0, isActive: true });
             setIsModalOpen(true);
           }}
           className="flex items-center gap-2 rounded-xl bg-[#064E3B] px-5 py-2.5 text-sm font-bold text-[#FFD680] shadow-lg transition hover:opacity-90 active:scale-95"
@@ -116,7 +115,6 @@ export default function AdminProductsPage() {
               <tr>
                 <th className="px-6 py-4">Sản phẩm</th>
                 <th className="px-6 py-4">SKU</th>
-                <th className="px-6 py-4 text-right">Giá</th>
                 <th className="px-6 py-4 text-center">Tồn kho</th>
                 <th className="px-6 py-4 text-center">Trạng thái</th>
                 <th className="px-6 py-4 text-right">Thao tác</th>
@@ -125,11 +123,11 @@ export default function AdminProductsPage() {
             <tbody className="divide-y divide-neutral-100">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-10 text-center text-neutral-400">Đang tải...</td>
+                  <td colSpan={5} className="px-6 py-10 text-center text-neutral-400">Đang tải...</td>
                 </tr>
               ) : products.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-10 text-center text-neutral-400">Không có sản phẩm nào</td>
+                  <td colSpan={5} className="px-6 py-10 text-center text-neutral-400">Không có sản phẩm nào</td>
                 </tr>
               ) : (
                 products.map((p) => (
@@ -141,9 +139,6 @@ export default function AdminProductsPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4 font-mono text-[11px] text-neutral-500">{p.sku}</td>
-                    <td className="px-6 py-4 text-right font-bold text-green-700">
-                      {new Intl.NumberFormat('vi-VN').format(p.price)}đ
-                    </td>
                     <td className="px-6 py-4 text-center">
                       <span className={`rounded-md px-2 py-1 text-[10px] font-bold ${p.stock > 10 ? "bg-blue-50 text-blue-600" : "bg-red-50 text-red-600"}`}>
                         {p.stock}
@@ -246,16 +241,6 @@ export default function AdminProductsPage() {
                   required
                   value={editingProduct?.unit || "chai"}
                   onChange={e => setEditingProduct(prev => prev ? ({...prev, unit: e.target.value}) : null)}
-                  className="w-full rounded-xl border border-neutral-200 px-4 py-3 text-sm outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1.5">Giá bán (VNĐ)</label>
-                <input
-                  required
-                  type="number"
-                  value={editingProduct?.price || 0}
-                  onChange={e => setEditingProduct(prev => prev ? ({...prev, price: Number(e.target.value)}) : null)}
                   className="w-full rounded-xl border border-neutral-200 px-4 py-3 text-sm outline-none"
                 />
               </div>

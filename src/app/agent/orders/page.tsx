@@ -7,7 +7,6 @@ type B2cOrder = {
   id: string;
   orderNumber: string;
   status: string;
-  totalAmount: string;
   createdAt: string;
   buyer: { phone: string; name: string | null };
   items: Array<{
@@ -137,9 +136,6 @@ function AgentOrdersContent() {
                   </div>
 
                   <div className="text-right">
-                    <p className="text-sm font-semibold text-green-700">
-                      {Number(order.totalAmount).toLocaleString()}đ
-                    </p>
                     <p className="text-[10px] text-neutral-400">
                       {formatDate(order.createdAt)}
                     </p>

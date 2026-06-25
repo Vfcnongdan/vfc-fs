@@ -20,12 +20,6 @@ type AgencyRow = Pick<
   | "wardProvince"
 >;
 
-type AgencyDistanceRow = Omit<AgencyRow, "taxCode" | "wardProvince"> & {
-  tax_code: string | null;
-  ward_province: string | null;
-  distance: number | { toString(): string };
-};
-
 function calculateDistanceMeters(
   latA: number,
   lonA: number,
@@ -69,23 +63,6 @@ function mapAgencyToDistance(
   };
 }
 
-function mapDistanceRow(row: AgencyDistanceRow): AgencyWithDistance {
-  return {
-    id: row.id,
-    code: row.code,
-    name: row.name,
-    phone: row.phone,
-    taxCode: row.tax_code,
-    salesman: row.salesman,
-    area: row.area,
-    address: row.address,
-    latitude: Number(row.latitude),
-    longitude: Number(row.longitude),
-    wardProvince: row.ward_province,
-    distance: Number(row.distance),
-  };
-}
-
 async function getFarmerPreferredAgency(
   userId: string,
   coords?: { lat: number; lon: number },
@@ -106,54 +83,7 @@ async function getFarmerPreferredAgency(
   return mapAgencyToDistance(agency, coords);
 }
 
-async function filterSellingAgencies(agencies: AgencyWithDistance[]) {
-  if (agencies.length === 0) return [];
-
-  const agencyRows = await prisma.agency.findMany({
-    where: {
-      id: { in: agencies.map((agency) => agency.id) },
-      userId: { not: null },
-    },
-    select: { id: true },
-  });
-
-  const sellingAgencyIds = new Set(agencyRows.map((agency) => agency.id));
-  return agencies.filter((agency) => sellingAgencyIds.has(agency.id));
-}
-
-async function getFallbackSellingAgencies(coords?: { lat: number; lon: number }) {
-  if (coords) {
-    const rows = await prisma.$queryRaw<AgencyDistanceRow[]>`
-      SELECT id, code, name, phone, address, latitude, longitude, tax_code, salesman, area, ward_province,
-        earth_distance(ll_to_earth(${coords.lat}, ${coords.lon}), ll_to_earth(latitude, longitude)) as distance
-      FROM agencies
-      WHERE user_id IS NOT NULL AND latitude <> 0 AND longitude <> 0
-      ORDER BY distance ASC
-      LIMIT 5
-    `;
-
-    if (rows.length > 0) return rows.map(mapDistanceRow);
-  }
-
-  const sellingAgencies = await prisma.agency.findMany({
-    where: { userId: { not: null } },
-    orderBy: { name: "asc" },
-    take: 5,
-  });
-
-  if (sellingAgencies.length > 0) {
-    return sellingAgencies.map((agency) => mapAgencyToDistance(agency, coords));
-  }
-
-  const anyAgencies = await prisma.agency.findMany({
-    orderBy: { name: "asc" },
-    take: 5,
-  });
-
-  return anyAgencies.map((agency) => mapAgencyToDistance(agency, coords));
-}
-
-async function getAgenciesByWard(ward: string): Promise<AgencyWithDistance[]> {
+async function getAgenciesByWard(ward: string, coords?: { lat: number; lon: number }): Promise<AgencyWithDistance[]> {
   const agencies = await prisma.agency.findMany({
     where: {
       userId: { not: null },
@@ -162,12 +92,26 @@ async function getAgenciesByWard(ward: string): Promise<AgencyWithDistance[]> {
         { address: { contains: ward, mode: "insensitive" } },
       ],
     },
-    orderBy: { name: "asc" },
-    take: 5,
+    take: 10,
   });
-  return agencies.map((a) => mapAgencyToDistance(a));
+  return agencies
+    .map((a) => mapAgencyToDistance(a, coords))
+    .sort((a, b) => a.distance - b.distance);
 }
 
+function dedupAndLimit(agencies: AgencyWithDistance[], limit: number): AgencyWithDistance[] {
+  const seen = new Set<string>();
+  const result: AgencyWithDistance[] = [];
+  for (const a of agencies) {
+    if (seen.has(a.id)) continue;
+    seen.add(a.id);
+    result.push(a);
+    if (result.length >= limit) break;
+  }
+  return result;
+}
+
+const MAX_AGENCIES = 5;
 
 export async function GET(request: NextRequest) {
   const headerList = await headers();
@@ -185,45 +129,50 @@ export async function GET(request: NextRequest) {
   const lon = lonStr ? parseFloat(lonStr) : NaN;
   const coords = Number.isFinite(lat) && Number.isFinite(lon) ? { lat, lon } : undefined;
 
-  const rawIds = searchParams.get("suggestionProductIds") ?? "";
-  const suggestionProductIds = rawIds
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
   const ward = searchParams.get("ward")?.trim() || null;
 
-
   try {
-    const preferredAgency = await getFarmerPreferredAgency(userId, coords);
-    if (preferredAgency) {
-      return NextResponse.json([preferredAgency]);
+    const combined: AgencyWithDistance[] = [];
+
+    // 1. Đại lý ưu tiên (agencyCode của nông dân) → đầu tiên
+    const preferred = await getFarmerPreferredAgency(userId, coords);
+    if (preferred) {
+      combined.push(preferred);
     }
 
-    const nearest = coords ? await getNearestAgencies(coords.lat, coords.lon) : [];
-    const stockedNearest =
-      suggestionProductIds.length > 0
-        ? await filterAgenciesForOrder(nearest, suggestionProductIds)
-        : await filterSellingAgencies(nearest);
-
-    if (stockedNearest.length > 0) {
-      return NextResponse.json(stockedNearest);
+    // 2. Đại lý gần nhất theo GPS
+    if (coords) {
+      const nearest = await getNearestAgencies(coords.lat, coords.lon);
+      const linked = await filterAgenciesForOrder(nearest);
+      combined.push(...linked);
     }
 
-    const sellingNearest = await filterSellingAgencies(nearest);
-    if (sellingNearest.length > 0) {
-      return NextResponse.json(sellingNearest);
+    // 3. Nếu chưa đủ 5, bổ sung theo ward/tỉnh
+    if (combined.length < MAX_AGENCIES && ward) {
+      const wardAgencies = await getAgenciesByWard(ward, coords);
+      combined.push(...wardAgencies);
     }
 
-    // Fallback theo xã của user (không có GPS)
-    if (ward) {
-      const wardAgencies = await getAgenciesByWard(ward);
-      if (wardAgencies.length > 0) {
-        return NextResponse.json(wardAgencies);
+    // 4. Nếu vẫn chưa đủ, lấy thêm đại lý gần nhất (không giới hạn bán kính)
+    if (combined.length < MAX_AGENCIES && coords) {
+      const fallbackRows = await prisma.$queryRaw<{ id: string }[]>`
+        SELECT id FROM agencies
+        WHERE user_id IS NOT NULL AND latitude <> 0 AND longitude <> 0
+        ORDER BY earth_distance(ll_to_earth(${coords.lat}, ${coords.lon}), ll_to_earth(latitude, longitude)) ASC
+        LIMIT 10
+      `;
+      if (fallbackRows.length > 0) {
+        const fallbackIds = fallbackRows.map((r) => r.id);
+        const fallbackAgencies = await prisma.agency.findMany({
+          where: { id: { in: fallbackIds } },
+        });
+        combined.push(
+          ...fallbackAgencies.map((a) => mapAgencyToDistance(a, coords)),
+        );
       }
     }
 
-    const fallbackAgencies = await getFallbackSellingAgencies(coords);
-    return NextResponse.json(fallbackAgencies);
+    return NextResponse.json(dedupAndLimit(combined, MAX_AGENCIES));
   } catch (error) {
     console.error("[Farmer Agencies GET]", error);
     return NextResponse.json({ error: "INTERNAL_ERROR" }, { status: 500 });

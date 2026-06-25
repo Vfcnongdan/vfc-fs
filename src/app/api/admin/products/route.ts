@@ -43,14 +43,14 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { name, sku, slug, price, unit, stock, isActive, detail, categoryId } = body;
+    const { name, sku, slug, unit, stock, isActive, detail, categoryId } = body;
 
     const product = await prisma.product.create({
       data: {
         name,
         sku,
         slug,
-        price,
+        price: 0,
         unit,
         stock: stock || 0,
         isActive: isActive !== undefined ? isActive : true,

@@ -29,7 +29,7 @@ export const b2cOrderDetailInclude = {
       id: true,
       phone: true,
       name: true,
-      agency: { select: { id: true, name: true, code: true, address: true } },
+      agency: { select: { id: true, name: true, code: true, address: true, phone: true } },
     },
   },
 } satisfies Prisma.B2cOrderInclude;
@@ -52,7 +52,7 @@ export async function buildB2cLineItems(
   sellerId: string,
   lines: LineInput[],
 ): Promise<
-  | { ok: true; items: { productDetailId: string; quantity: number; price: Prisma.Decimal }[]; totalAmount: number }
+  | { ok: true; items: { productDetailId: string; quantity: number; price: number }[] }
   | { ok: false; error: string; status: number }
 > {
   const resolved: { productDetailId: string; quantity: number }[] = [];
@@ -68,20 +68,11 @@ export async function buildB2cLineItems(
   const detailIds = resolved.map((r) => r.productDetailId);
   const details = await prisma.productDetail.findMany({
     where: { id: { in: detailIds } },
-    include: { product: { select: { price: true, isActive: true } } },
+    include: { product: { select: { isActive: true } } },
   });
   const detailMap = new Map(details.map((d) => [d.id, d]));
 
-  const inventories = await prisma.inventory.findMany({
-    where: {
-      ownerId: sellerId,
-      productDetailId: { in: detailIds },
-    },
-  });
-  const stockMap = new Map(inventories.map((i) => [i.productDetailId, i.quantity]));
-
-  let totalAmount = 0;
-  const items: { productDetailId: string; quantity: number; price: Prisma.Decimal }[] = [];
+  const items: { productDetailId: string; quantity: number; price: number }[] = [];
 
   for (const line of resolved) {
     const detail = detailMap.get(line.productDetailId);
@@ -89,17 +80,14 @@ export async function buildB2cLineItems(
       return { ok: false, error: "PRODUCT_NOT_FOUND_OR_INACTIVE", status: 400 };
     }
 
-    // Stock check removed - allow orders regardless of inventory
-    const unitPrice = detail.product.price;
-    totalAmount += Number(unitPrice) * line.quantity;
     items.push({
       productDetailId: line.productDetailId,
       quantity: line.quantity,
-      price: unitPrice,
+      price: 0,
     });
   }
 
-  return { ok: true, items, totalAmount };
+  return { ok: true, items };
 }
 
 export async function resolveSellerIdFromAgency(

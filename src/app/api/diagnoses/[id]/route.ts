@@ -36,7 +36,7 @@ export async function GET(
       suggestions: {
         include: {
           product: {
-            select: { id: true, name: true, imageUrls: true, slug: true, price: true },
+            select: { id: true, name: true, imageUrls: true, slug: true },
           },
         },
         orderBy: { rank: "asc" },
@@ -123,7 +123,7 @@ export async function PATCH(
       suggestions: {
         include: {
           product: {
-            select: { id: true, name: true, imageUrls: true, slug: true, price: true },
+            select: { id: true, name: true, imageUrls: true, slug: true },
           },
         },
         orderBy: { rank: "asc" },

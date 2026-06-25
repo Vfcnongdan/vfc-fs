@@ -4,7 +4,8 @@ import { prisma } from "@/lib/prisma";
 type CropChangeUser = Pick<User, "id" | "role" | "name">;
 
 function requiresCropChangeApproval(user: CropChangeUser) {
-  return user.role === Role.FARMER || user.role === Role.AGENCY;
+  // Chỉ FARMER cần duyệt bởi MDO, các role khác (AGENCY, SE, MDO...) tự do thay đổi
+  return user.role === Role.FARMER;
 }
 
 function sameCropIds(a: string[], b: string[]) {
@@ -14,6 +15,7 @@ function sameCropIds(a: string[], b: string[]) {
 }
 
 export async function findCropChangeReviewer(user: CropChangeUser) {
+  // Chỉ FARMER cần reviewer (MDO)
   if (user.role === Role.FARMER) {
     const farmer = await prisma.farmer.findUnique({
       where: { userId: user.id },
@@ -27,21 +29,6 @@ export async function findCropChangeReviewer(user: CropChangeUser) {
       include: { user: true },
     });
     return mdo?.user ?? null;
-  }
-
-  if (user.role === Role.AGENCY) {
-    const agency = await prisma.agency.findUnique({
-      where: { userId: user.id },
-      select: { salesman: true },
-    });
-    const seName = agency?.salesman?.trim();
-    if (!seName) return null;
-
-    const se = await prisma.se.findFirst({
-      where: { name: seName, userId: { not: null } },
-      include: { user: true },
-    });
-    return se?.user ?? null;
   }
 
   return null;

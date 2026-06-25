@@ -12,7 +12,6 @@ type B2cOrder = {
   id: string;
   orderNumber: string;
   status: string;
-  totalAmount: string;
   createdAt: string;
   items: B2cOrderItem[];
 };
@@ -89,11 +88,6 @@ export default function OrdersPage() {
                   </p>
                   <p className="text-[10px] text-neutral-400 mt-0.5">
                     {new Date(order.createdAt).toLocaleString("vi-VN")}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-bold text-green-700">
-                    {Number(order.totalAmount).toLocaleString()}đ
                   </p>
                 </div>
               </div>

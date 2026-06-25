@@ -16,7 +16,6 @@ export const getCachedProducts = unstable_cache(
         slug: true,
         description: true,
         imageUrls: true,
-        price: true,
         unit: true,
         detail: {
           select: {
@@ -29,10 +28,7 @@ export const getCachedProducts = unstable_cache(
       orderBy: { createdAt: "desc" },
     });
 
-    return products.map((product) => ({
-      ...product,
-      price: Number(product.price),
-    }));
+    return products;
   },
   ["vfc-products-list"], // Cache Key
   {

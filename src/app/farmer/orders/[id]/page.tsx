@@ -67,6 +67,7 @@ export default function OrderDetailPage() {
           <p className="text-sm text-neutral-600 mb-4">
             Đại lý: <strong>{order.seller.agency.name}</strong>
             {order.seller.agency.address && ` — ${order.seller.agency.address}`}
+            {order.seller.agency.phone && ` - ${order.seller.agency.phone}`}
           </p>
         )}
 
@@ -79,17 +80,9 @@ export default function OrderDetailPage() {
                 </p>
                 <p className="text-xs text-neutral-400">SL: {item.quantity}</p>
               </div>
-              <p className="font-semibold text-green-700 shrink-0">
-                {(Number(item.price) * item.quantity).toLocaleString()}đ
-              </p>
             </li>
           ))}
         </ul>
-
-        <div className="border-t mt-4 pt-4 flex justify-between font-bold text-neutral-800">
-          <span>Tổng cộng</span>
-          <span className="text-green-700">{Number(order.totalAmount).toLocaleString()}đ</span>
-        </div>
       </div>
     </div>
   );
