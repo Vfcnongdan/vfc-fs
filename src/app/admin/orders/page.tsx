@@ -13,7 +13,7 @@ type B2cOrder = {
   seller: { name: string | null; agency?: { name: string } | null };
   items: Array<{
     quantity: number;
-    productDetail: { product: { name: string } };
+    product: { name: string };
   }>;
 };
 
@@ -108,7 +108,7 @@ function AdminOrdersContent() {
           {orders.map((order) => {
             const status = STATUS_MAP[order.status] || { label: order.status, color: "bg-neutral-100 text-neutral-600" };
             const isExpanded = expandedId === order.id;
-            const mainItem = order.items[0]?.productDetail?.product?.name;
+            const mainItem = order.items[0]?.product?.name;
             const extraCount = order.items.length - 1;
             const isHighlighted = searchParams.get("orderId") === order.id;
 
@@ -181,7 +181,7 @@ function AdminOrdersContent() {
                     <div className="mb-4 space-y-2 bg-neutral-50 rounded-lg p-3">
                       {order.items.map((item, idx) => (
                         <div key={idx} className="flex justify-between text-sm">
-                          <span className="text-neutral-700 font-medium">{item.productDetail?.product?.name}</span>
+                           <span className="text-neutral-700 font-medium">{item.product?.name}</span>
                           <span className="tabular-nums text-neutral-600 font-bold">×{item.quantity}</span>
                         </div>
                       ))}

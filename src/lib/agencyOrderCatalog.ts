@@ -3,12 +3,12 @@ import type { AgencyWithDistance } from "@/services/agencyService";
 
 export type OrderCatalogItem = {
   productId: string;
-  productDetailId: string;
   name: string;
   slug: string;
   stock: number;
   unit: string;
   imageUrls: string[];
+  detail?: { targetDiseases?: string; usageInstruction?: string; description?: string };
 };
 
 export type AgencyOrderCatalog = {
@@ -45,15 +45,16 @@ export async function getAgencyOrderCatalog(
   if (!agency?.userId) return null;
 
   const allProducts = await prisma.product.findMany({
-    where: { isActive: true, detail: { isNot: null } },
+    where: { isActive: true },
     select: {
       id: true,
       name: true,
       slug: true,
       unit: true,
+      stock: true,
       imageUrls: true,
       detail: {
-        select: { id: true },
+        select: { targetDiseases: true, usageInstruction: true, description: true },
       },
     },
   });
@@ -65,12 +66,18 @@ export async function getAgencyOrderCatalog(
   for (const product of allProducts) {
     const item: OrderCatalogItem = {
       productId: product.id,
-      productDetailId: product.detail?.id ?? "",
       name: product.name,
       slug: product.slug,
-      stock: 0,
+      stock: product.stock,
       unit: product.unit,
       imageUrls: product.imageUrls,
+      detail: product.detail
+        ? {
+            targetDiseases: product.detail.targetDiseases ?? undefined,
+            usageInstruction: product.detail.usageInstruction ?? undefined,
+            description: product.detail.description ?? undefined,
+          }
+        : undefined,
     };
 
     if (suggestionSet.has(product.id)) {

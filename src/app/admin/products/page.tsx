@@ -133,10 +133,10 @@ export default function AdminProductsPage() {
                 products.map((p) => (
                   <tr key={p.id} className="hover:bg-neutral-50/50 transition-colors">
                     <td className="px-6 py-4">
-                      <div className="flex flex-col">
-                        <span className="font-bold text-neutral-800 uppercase text-xs">{p.name}</span>
-                        <span className="text-[10px] text-neutral-400">{p.unit}</span>
-                      </div>
+              <div className="flex flex-col">
+                <span className="font-bold text-neutral-800 uppercase text-xs">{p.name}</span>
+                <span className="text-[10px] text-neutral-400">SKU: {p.sku} · {p.unit}</span>
+              </div>
                     </td>
                     <td className="px-6 py-4 font-mono text-[11px] text-neutral-500">{p.sku}</td>
                     <td className="px-6 py-4 text-center">
@@ -257,6 +257,7 @@ export default function AdminProductsPage() {
 
               <div className="col-span-2 pt-4 border-t border-neutral-100 mt-4">
                 <h3 className="text-xs font-bold text-[#064E3B] uppercase mb-4">Chi tiết bổ sung (AI Diagnosis)</h3>
+                <p className="text-[10px] text-neutral-400 mb-2">Nếu không có thông tin này, hệ thống sẽ để trống khi hiển thị.</p>
                 <div className="grid gap-4">
                   <div>
                     <label className="block text-[10px] font-bold text-neutral-400 uppercase mb-1.5">Cây trồng phù hợp</label>

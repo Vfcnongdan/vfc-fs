@@ -11,7 +11,7 @@ type B2cOrder = {
   buyer: { phone: string; name: string | null };
   items: Array<{
     quantity: number;
-    productDetail: { product: { name: string } };
+    product: { name: string };
   }>;
 };
 
@@ -88,7 +88,7 @@ function AgentOrdersContent() {
           {orders.map((order) => {
             const status = STATUS_MAP[order.status] || { label: order.status, color: "bg-neutral-100 text-neutral-600" };
             const isExpanded = expandedId === order.id;
-            const mainItem = order.items[0]?.productDetail?.product?.name;
+            const mainItem = order.items[0]?.product?.name;
             const extraCount = order.items.length - 1;
 
             return (
@@ -147,7 +147,7 @@ function AgentOrdersContent() {
                     <div className="mb-3 space-y-1">
                       {order.items.map((item, idx) => (
                         <div key={idx} className="flex justify-between text-xs">
-                          <span className="text-neutral-600">{item.productDetail?.product?.name}</span>
+                          <span className="text-neutral-600">{item.product?.name}</span>
                           <span className="tabular-nums text-neutral-500">x{item.quantity}</span>
                         </div>
                       ))}

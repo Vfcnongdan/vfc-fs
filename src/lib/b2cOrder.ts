@@ -4,10 +4,8 @@ import { prisma } from "@/lib/prisma";
 export const b2cOrderListInclude = {
   items: {
     include: {
-      productDetail: {
-        include: {
-          product: { select: { id: true, name: true, sku: true, imageUrls: true, unit: true } },
-        },
+      product: {
+        select: { id: true, name: true, sku: true, imageUrls: true, unit: true },
       },
     },
   },
@@ -18,8 +16,8 @@ export const b2cOrderListInclude = {
 export const b2cOrderDetailInclude = {
   items: {
     include: {
-      productDetail: {
-        include: { product: true },
+      product: {
+        include: { detail: { select: { id: true, targetDiseases: true, usageInstruction: true, description: true } } },
       },
     },
   },
@@ -34,58 +32,34 @@ export const b2cOrderDetailInclude = {
   },
 } satisfies Prisma.B2cOrderInclude;
 
-type LineInput = { productId?: string; productDetailId?: string; quantity: number };
-
-export async function resolveProductDetailId(
-  line: LineInput,
-): Promise<string | null> {
-  if (line.productDetailId) return line.productDetailId;
-  if (!line.productId) return null;
-  const detail = await prisma.productDetail.findUnique({
-    where: { productId: line.productId },
-    select: { id: true },
-  });
-  return detail?.id ?? null;
-}
+type LineInput = { productId: string; quantity: number };
 
 export async function buildB2cLineItems(
   sellerId: string,
   lines: LineInput[],
 ): Promise<
-  | { ok: true; items: { productDetailId: string; quantity: number; price: number }[] }
+  | { ok: true; items: { productId: string; quantity: number; price: number }[] }
   | { ok: false; error: string; status: number }
 > {
-  const resolved: { productDetailId: string; quantity: number }[] = [];
+  const productIds = lines.map((l) => l.productId);
 
-  for (const line of lines) {
-    const productDetailId = await resolveProductDetailId(line);
-    if (!productDetailId) {
-      return { ok: false, error: "PRODUCT_NOT_IN_CATALOG", status: 400 };
-    }
-    resolved.push({ productDetailId, quantity: line.quantity });
-  }
-
-  const detailIds = resolved.map((r) => r.productDetailId);
-  const details = await prisma.productDetail.findMany({
-    where: { id: { in: detailIds } },
-    include: { product: { select: { isActive: true } } },
+  const products = await prisma.product.findMany({
+    where: { id: { in: productIds }, isActive: true },
+    select: { id: true },
   });
-  const detailMap = new Map(details.map((d) => [d.id, d]));
 
-  const items: { productDetailId: string; quantity: number; price: number }[] = [];
-
-  for (const line of resolved) {
-    const detail = detailMap.get(line.productDetailId);
-    if (!detail?.product.isActive) {
+  const validIds = new Set(products.map((p) => p.id));
+  for (const line of lines) {
+    if (!validIds.has(line.productId)) {
       return { ok: false, error: "PRODUCT_NOT_FOUND_OR_INACTIVE", status: 400 };
     }
-
-    items.push({
-      productDetailId: line.productDetailId,
-      quantity: line.quantity,
-      price: 0,
-    });
   }
+
+  const items = lines.map((line) => ({
+    productId: line.productId,
+    quantity: line.quantity,
+    price: 0,
+  }));
 
   return { ok: true, items };
 }

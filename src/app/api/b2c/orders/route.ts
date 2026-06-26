@@ -15,8 +15,7 @@ const createSchema = z.object({
   items: z
     .array(
       z.object({
-        productId: z.string().optional(),
-        productDetailId: z.string().optional(),
+        productId: z.string().min(1),
         quantity: z.number().int().min(1),
       }),
     )

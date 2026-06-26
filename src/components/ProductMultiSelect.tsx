@@ -2,11 +2,11 @@
 
 export type MultiSelectProduct = {
   productId: string;
-  productDetailId: string;
   name: string;
   stock: number;
   unit: string;
   imageUrls?: string[];
+  detail?: { targetDiseases?: string; usageInstruction?: string; description?: string };
 };
 
 type Props = {

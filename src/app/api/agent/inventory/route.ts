@@ -11,17 +11,14 @@ export async function GET(req: NextRequest) {
     const inventories = await prisma.inventory.findMany({
       where: { ownerId: userId },
       include: {
-        productDetail: {
-          include: {
-            product: {
-              select: {
-                id: true,
-                name: true,
-                sku: true,
-                imageUrls: true,
-                unit: true,
-              },
-            },
+        product: {
+          select: {
+            id: true,
+            name: true,
+            sku: true,
+            imageUrls: true,
+            unit: true,
+            detail: { select: { targetDiseases: true, usageInstruction: true, description: true } },
           },
         },
       },
@@ -43,35 +40,33 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { productDetailId, quantity } = body;
+    const { productId, quantity } = body;
 
-    if (!productDetailId || typeof quantity !== "number" || quantity < 0) {
+    if (!productId || typeof quantity !== "number" || quantity < 0) {
       return NextResponse.json({ error: "Invalid data" }, { status: 400 });
     }
 
-    // Xác thực sản phẩm có tồn tại trong hệ thống hay không
-    const productDetail = await prisma.productDetail.findUnique({
-      where: { id: productDetailId },
+    const product = await prisma.product.findUnique({
+      where: { id: productId },
     });
 
-    if (!productDetail) {
+    if (!product) {
       return NextResponse.json({ error: "Product not found in company catalog" }, { status: 404 });
     }
 
-    // Upsert inventory
     const inventory = await prisma.inventory.upsert({
       where: {
-        ownerId_productDetailId: {
+        ownerId_productId: {
           ownerId: userId,
-          productDetailId,
+          productId,
         },
       },
       update: {
-        quantity, // Replace with new quantity (can also be an increment based on business logic, but absolute value is simpler for UI)
+        quantity,
       },
       create: {
         ownerId: userId,
-        productDetailId,
+        productId,
         quantity,
       },
     });

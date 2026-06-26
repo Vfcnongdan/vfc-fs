@@ -131,12 +131,12 @@ export default function DiagnosePage() {
   const base64CacheRef = useRef<string[]>([]);
 
   // Combo order modal state
-  const [orderModalSet, setOrderModalSet] = useState<{ name: string; products: { id: string; name: string; imageUrls?: string[]; productDetailId?: string }[] } | null>(null);
+  const [orderModalSet, setOrderModalSet] = useState<{ name: string; products: { id: string; name: string; imageUrls?: string[] }[] } | null>(null);
   const [selectedAgencyId, setSelectedAgencyId] = useState<string>("");
   const [orderFarmArea, setOrderFarmArea] = useState<string>("1.0");
   const [additionalSelected, setAdditionalSelected] = useState<Map<string, number>>(new Map());
   const [additionalProducts, setAdditionalProducts] = useState<MultiSelectProduct[]>([]);
-  const [suggestedFromCatalog, setSuggestedFromCatalog] = useState<{ id: string; name: string; imageUrls: string[]; productDetailId: string }[]>([]);
+  const [suggestedFromCatalog, setSuggestedFromCatalog] = useState<{ id: string; name: string; imageUrls: string[]; detail?: { targetDiseases?: string; usageInstruction?: string; description?: string } }[]>([]);
   const [loadingCatalog, setLoadingCatalog] = useState(false);
   const [orderSubmitting, setOrderSubmitting] = useState(false);
   const [orderError, setOrderError] = useState("");
@@ -249,14 +249,12 @@ export default function DiagnosePage() {
         if (res.ok) {
           setAdditionalProducts(data.additional ?? []);
           setSuggestedFromCatalog(
-            (data.suggested ?? [])
-              .filter((s: { productDetailId: string }) => s.productDetailId)
-              .map((s: { productId: string; name: string; productDetailId: string; imageUrls?: string[] }) => ({
-                id: s.productId,
-                name: s.name,
-                productDetailId: s.productDetailId,
-                imageUrls: s.imageUrls ?? [],
-              })),
+            (data.suggested ?? []).map((s: { productId: string; name: string; imageUrls?: string[]; detail?: { targetDiseases?: string; usageInstruction?: string; description?: string } }) => ({
+              id: s.productId,
+              name: s.name,
+              imageUrls: s.imageUrls ?? [],
+              detail: s.detail,
+            })),
           );
         } else {
           setAdditionalProducts([]);
@@ -315,18 +313,15 @@ export default function DiagnosePage() {
       setOrderError("Vui lòng chọn đại lý");
       return;
     }
-    const comboDetailMap = new Map(suggestedFromCatalog.map((s) => [s.id, s.productDetailId]));
-    const comboItems = orderModalSet.products
-      .map((p) => ({
-        productDetailId: p.productDetailId ?? comboDetailMap.get(p.id) ?? "",
-        quantity: comboDefaultQty,
-      }))
-      .filter((item) => item.productDetailId);
-    const extraItems: { productDetailId: string; quantity: number }[] = [];
+    const comboItems = orderModalSet.products.map((p) => ({
+      productId: p.id,
+      quantity: comboDefaultQty,
+    }));
+    const extraItems: { productId: string; quantity: number }[] = [];
     for (const [pid, qty] of additionalSelected) {
       if (qty > 0) {
         const ap = additionalProducts.find((p) => p.productId === pid);
-        if (ap?.productDetailId) extraItems.push({ productDetailId: ap.productDetailId, quantity: qty });
+        if (ap) extraItems.push({ productId: ap.productId, quantity: qty });
       }
     }
     const items = [...comboItems, ...extraItems];

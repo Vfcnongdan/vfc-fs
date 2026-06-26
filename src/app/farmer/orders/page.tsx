@@ -5,7 +5,7 @@ import Link from "next/link";
 
 type B2cOrderItem = {
   quantity: number;
-  productDetail: { product: { name: string } };
+  product: { name: string };
 };
 
 type B2cOrder = {
@@ -25,7 +25,7 @@ const STATUS_MAP: Record<string, { label: string; class: string }> = {
 };
 
 function firstProductName(order: B2cOrder): string {
-  return order.items[0]?.productDetail?.product?.name ?? "Đơn hàng";
+  return order.items[0]?.product?.name ?? "Đơn hàng";
 }
 
 export default function OrdersPage() {

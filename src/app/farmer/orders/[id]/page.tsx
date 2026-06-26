@@ -75,8 +75,11 @@ export default function OrderDetailPage() {
           {order.items?.map((item: any) => (
             <li key={item.id} className="py-3 flex justify-between gap-4">
               <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold text-neutral-400 uppercase">Sản phẩm</span>
+                </div>
                 <p className="font-medium text-neutral-800">
-                  {item.productDetail?.product?.name}
+                  {item.product?.name}
                 </p>
                 <p className="text-xs text-neutral-400">SL: {item.quantity}</p>
               </div>

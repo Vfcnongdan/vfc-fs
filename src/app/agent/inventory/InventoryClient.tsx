@@ -44,7 +44,7 @@ export default function InventoryClient({ products }: { products: any[] }) {
       const res = await fetch("/api/agent/inventory", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productDetailId: selectedProduct, quantity: Number(quantity) }),
+        body: JSON.stringify({ productId: selectedProduct, quantity: Number(quantity) }),
       });
       if (res.ok) {
         await fetchInventory();
@@ -63,19 +63,19 @@ export default function InventoryClient({ products }: { products: any[] }) {
 
   // Mở modal sửa kho
   const handleEdit = (item: any) => {
-    setSelectedProduct(String(item.productDetailId));
+    setSelectedProduct(String(item.productId));
     setQuantity(item.quantity);
     setIsModalOpen(true);
   };
 
-  const inventoryProductIds = new Set(inventory.map((item) => String(item.productDetailId)));
+  const inventoryProductIds = new Set(inventory.map((item) => String(item.productId)));
   const availableProducts = products.filter((p) => {
-    const productId = String(p.detail?.id ?? "");
+    const productId = String(p.id);
     return !inventoryProductIds.has(productId) || productId === selectedProduct;
   });
 
   const filteredInventory = inventory.filter((item) =>
-    item.productDetail.product.name.toLowerCase().includes(search.toLowerCase())
+    (item.product?.name ?? "").toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -115,7 +115,7 @@ export default function InventoryClient({ products }: { products: any[] }) {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredInventory.map((item) => {
-            const p = item.productDetail.product;
+            const p = item.product;
             return (
               <div key={item.id} className="bg-white p-4 rounded-2xl shadow-sm border flex items-center gap-4">
                 <div className="w-16 h-16 bg-gray-100 rounded-lg overflow-hidden shrink-0 relative">
@@ -160,8 +160,8 @@ export default function InventoryClient({ products }: { products: any[] }) {
                 >
                   <option value="" disabled>-- Chọn sản phẩm --</option>
                   {availableProducts.map((p) => (
-                    <option key={p.id} value={p.detail?.id || ""} disabled={!p.detail?.id}>
-                      {p.name} ({p.unit}){!p.detail?.id ? " - Chưa cấu hình chi tiết" : ""}
+                    <option key={p.id} value={p.id}>
+                      {p.name} ({p.unit})
                     </option>
                   ))}
                 </select>
