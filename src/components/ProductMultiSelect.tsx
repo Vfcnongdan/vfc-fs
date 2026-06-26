@@ -6,6 +6,7 @@ export type MultiSelectProduct = {
   name: string;
   stock: number;
   unit: string;
+  imageUrls?: string[];
 };
 
 type Props = {
@@ -73,6 +74,14 @@ export function ProductMultiSelect({
                 onChange={() => toggle(p.productId)}
                 className="mt-1 rounded border-neutral-300 text-blue-600 focus:ring-blue-500"
               />
+              <div className="h-10 w-10 shrink-0 rounded-lg border border-neutral-100 bg-neutral-50 p-1 flex items-center justify-center overflow-hidden">
+                {p.imageUrls?.[0] ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={p.imageUrls[0]} alt={p.name} className="max-h-full max-w-full object-contain" />
+                ) : (
+                  <span className="text-lg">🧪</span>
+                )}
+              </div>
               <div className="flex justify-between flex-1 min-w-0">
                 <div>
                   <p className="text-sm font-semibold text-neutral-800 leading-tight">{p.name}</p>

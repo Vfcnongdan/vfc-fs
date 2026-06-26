@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { planStageDesease, cropGrowthStageOptions } from "@/lib/deseaseDetails";
 import { DiagnosisStatus } from "@prisma/client";
 
-type AiProvider = "gemini" | "groq";
+type AiProvider = "gemini" | "groq" | "openrouter";
 
 export type ImageValidationReasonCode =
   | "VALID"
@@ -484,22 +484,99 @@ async function analyzeWithGroq(
   return parseAiJson(text, "groq");
 }
 
+async function analyzeWithOpenRouter(
+  prompt: string,
+  userImages: string[],
+  referenceData: ReferenceData[]
+): Promise<AiDiagnosisResponse> {
+  const hasApiKey = !!process.env.OPENROUTER_API_KEY;
+  console.log(`[AI Diagnosis OpenRouter API Key Check] Key exists: ${hasApiKey}`);
+  if (!hasApiKey) {
+    throw new Error("OPENROUTER_API_KEY is not defined in environment variables");
+  }
+
+  const content: GroqContentPart[] = [
+    { type: "text", text: "Ảnh cây trồng của nông dân:" },
+  ];
+  for (const b64 of userImages) {
+    content.push({
+      type: "image_url",
+      image_url: { url: `data:image/jpeg;base64,${b64}` },
+    });
+  }
+  content.push({ type: "text", text: "\n\nDữ liệu bệnh tham khảo của VFC:" });
+  for (const ref of referenceData) {
+    content.push({ type: "text", text: "\n" + ref.text });
+    if (ref.base64Image) {
+      content.push({
+        type: "image_url",
+        image_url: { url: `data:image/jpeg;base64,${ref.base64Image}` },
+      });
+    }
+  }
+  content.push({ type: "text", text: `\n\n${prompt}` });
+
+  const model = process.env.OPENROUTER_MODEL || "google/gemini-flash-1.5";
+  console.log(`[AI Diagnosis API Call] Sending request to OpenRouter (${model})...`);
+
+  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+      "HTTP-Referer": process.env.NEXT_PUBLIC_BASE_URL || "https://vfc.vn",
+      "X-Title": "VFC Farmer Portal",
+    },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: "user", content }],
+      temperature: 0.2,
+      max_tokens: 1024,
+      response_format: { type: "json_object" },
+    }),
+  });
+
+  const responseText = await res.text();
+  const data = JSON.parse(responseText || "{}");
+  if (!res.ok) {
+    throw new Error(
+      `OpenRouter API failed with ${res.status}: ${JSON.stringify(data)}`
+    );
+  }
+
+  const text = data?.choices?.[0]?.message?.content;
+  if (!text) throw new Error("OpenRouter API returned an empty response");
+
+  console.log(
+    `[AI Diagnosis OpenRouter Response] Received response. Text length: ${text.length}\nRaw text:`, text
+  );
+  return parseAiJson(text, "openrouter");
+}
+
 async function analyzeWithFallback(
   prompt: string,
   userImages: string[],
   referenceData: ReferenceData[]
 ): Promise<AiDiagnosisResponse> {
+  // 1st: Gemini
   try {
     const parsed = await analyzeWithGemini(prompt, userImages, referenceData);
     return { ...parsed, aiProvider: "gemini" };
   } catch (geminiError) {
-    console.error(
-      "[AI Diagnosis Gemini Error] Falling back to Groq",
-      geminiError
-    );
+    console.error("[AI Diagnosis Gemini Error] Falling back to Groq", geminiError);
   }
-  const parsed = await analyzeWithGroq(prompt, userImages, referenceData);
-  return { ...parsed, aiProvider: "groq", fallbackFrom: "gemini" };
+
+  // 2nd: Groq
+  try {
+    const parsed = await analyzeWithGroq(prompt, userImages, referenceData);
+    return { ...parsed, aiProvider: "groq", fallbackFrom: "gemini" };
+  } catch (groqError) {
+    console.error("[AI Diagnosis Groq Error] Falling back to OpenRouter", groqError);
+  }
+
+  // 3rd: OpenRouter
+  const parsed = await analyzeWithOpenRouter(prompt, userImages, referenceData);
+  return { ...parsed, aiProvider: "openrouter", fallbackFrom: "groq" };
 }
 
 export async function runAiDiagnosis(
