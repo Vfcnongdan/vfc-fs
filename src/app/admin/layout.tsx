@@ -24,9 +24,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const canSeeOrders = user?.role === "ADMIN" || user?.role === "AGENCY" || user?.role === "SUPER_AGENT" || user?.role === "MDO" || user?.role === "SE";
   const isAdminOnly = user?.role === "ADMIN";
+  const isMdo = user?.role === "MDO";
 
   const menuItems = [
     { href: "/admin", icon: "📈", label: "Tổng quan", show: true },
+    { href: "/admin/crop-change-requests", icon: "🌱", label: "Duyệt cây trồng", show: isMdo },
     { href: "/admin/orders", icon: "🛒", label: "Quản lý đơn hàng", show: canSeeOrders },
     { href: "/admin/products", icon: "📦", label: "Sản phẩm", show: isAdminOnly },
     { href: "/admin/system/users", icon: "👤", label: "Người dùng", show: isAdminOnly },

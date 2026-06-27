@@ -109,7 +109,7 @@ export function notificationHrefForRole(
   cropChangeRequestId: string | null,
 ) {
   if (type === "CROP_CHANGE_REQUESTED" && cropChangeRequestId) {
-    return `/admin/crop-change-requests/${cropChangeRequestId}`;
+    return `/admin/crop-change-requests?focus=${cropChangeRequestId}`;
   }
   if (type === "CROP_CHANGE_PENDING" && cropChangeRequestId) {
     return `/farmer`;

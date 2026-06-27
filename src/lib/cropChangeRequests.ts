@@ -25,7 +25,13 @@ export async function findCropChangeReviewer(user: CropChangeUser) {
     if (!mdoName) return null;
 
     const mdo = await prisma.mdo.findFirst({
-      where: { name: mdoName, userId: { not: null } },
+      where: {
+        OR: [
+          { name: { equals: mdoName, mode: "insensitive" } },
+          { employeeCode: { equals: mdoName, mode: "insensitive" } },
+        ],
+        userId: { not: null },
+      },
       include: { user: true },
     });
     return mdo?.user ?? null;

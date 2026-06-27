@@ -2,8 +2,7 @@
 .env
 .env.production
 .env.staging
-.env.local
-.env*.local
+.env.development
 
 # ─── Next.js ─────────────
 /.next/
