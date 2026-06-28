@@ -78,15 +78,15 @@ export function NotificationBell({ dark = false }: { dark?: boolean }) {
         type="button"
         aria-label="Thông báo"
         onClick={() => setOpen((v) => !v)}
-        className={`relative inline-flex h-10 w-10 items-center justify-center rounded-full border transition ${
+        className={`relative inline-flex h-8 w-8 items-center justify-center rounded-full border transition ${
           dark
             ? "border-white/20 bg-white/10 text-white hover:bg-white/15"
             : "border-neutral-200 bg-white text-neutral-700 shadow-sm hover:bg-neutral-50"
         }`}
       >
-        <Bell size={18} />
+        <Bell size={16} />
         {unreadCount > 0 && (
-          <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-red-600 px-1.5 py-0.5 text-center text-[10px] font-bold leading-none text-white ring-2 ring-white">
+          <span className="absolute -right-1 -top-1 min-w-[18px] rounded-full bg-red-600 px-1 py-0.5 text-center text-[9px] font-bold leading-none text-white ring-2 ring-red-600">
             {unreadCount > 99 ? "99+" : unreadCount}
           </span>
         )}

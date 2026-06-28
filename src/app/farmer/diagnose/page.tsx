@@ -6,10 +6,12 @@ import {
   ImagePlus,
   Leaf,
   Search,
+  Share2,
   Sprout,
   UploadCloud,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { captureElementToPng } from "@/lib/shareDiagnosis";
 import {
   ProductMultiSelect,
   type MultiSelectProduct,
@@ -129,6 +131,7 @@ export default function DiagnosePage() {
   const [stageConfirmCountdown, setStageConfirmCountdown] = useState(5);
   /** Cache base64 ảnh để gửi lại nếu user chọn giai đoạn */
   const base64CacheRef = useRef<string[]>([]);
+  const resultCardRef = useRef<HTMLDivElement>(null);
 
   // Combo order modal state
   const [orderModalSet, setOrderModalSet] = useState<{ name: string; products: { id: string; name: string; imageUrls?: string[] }[] } | null>(null);
@@ -353,6 +356,52 @@ export default function DiagnosePage() {
       setOrderSubmitting(false);
     }
   };
+
+  const handleShare = async () => {
+    if (!resultCardRef.current) {
+      toast.error("Không tìm thấy kết quả để chia sẻ");
+      return;
+    }
+
+    const canShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
+
+    try {
+      const blob = await captureElementToPng(resultCardRef.current);
+
+      const file = new File([blob], "ket-qua-chan-doan.png", {
+        type: blob.type || "image/png",
+      });
+
+      if (canShare) {
+        navigator
+          .share({
+            title: "Kết quả chẩn đoán cây trồng - VFC",
+            text: result?.summary || "Kết quả chẩn đoán bệnh cây trồng từ VFC",
+            files: [file],
+          })
+          .catch(() => {
+            downloadAndFallback(file);
+          });
+      } else {
+        downloadAndFallback(file);
+      }
+    } catch (err) {
+      console.error("[Share] shareDiagnosis failed:", err);
+      toast.error("Không thể chụp kết quả để chia sẻ");
+    }
+  };
+
+  function downloadAndFallback(file: File) {
+    const url = URL.createObjectURL(file);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "ket-qua-chan-doan.png";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success("Đã tải ảnh kết quả về thiết bị");
+  }
 
   useEffect(() => {
     fetchUserCrops();
@@ -832,25 +881,37 @@ export default function DiagnosePage() {
 
           {/* Result */}
           {result && !awaitingStage && (
-            <div className="card flex flex-col gap-4">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold">Kết quả</span>
-            <span
-              className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                result.status === "DONE"
-                  ? "bg-green-100 text-green-700"
-                  : result.status === "FAILED"
-                    ? "bg-red-100 text-red-600"
-                    : "bg-yellow-100 text-yellow-700"
-              }`}
-            >
-              {result.status === "PROCESSING"
-                ? "Đang xử lý..."
-                : result.status === "DONE"
-                  ? "Hoàn tất"
-                  : "Thất bại"}
-            </span>
-          </div>
+            <div ref={resultCardRef} className="card flex flex-col gap-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold">Kết quả</span>
+                  <span
+                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                      result.status === "DONE"
+                        ? "bg-green-100 text-green-700"
+                        : result.status === "FAILED"
+                          ? "bg-red-100 text-red-600"
+                          : "bg-yellow-100 text-yellow-700"
+                    }`}
+                  >
+                    {result.status === "PROCESSING"
+                      ? "Đang xử lý..."
+                      : result.status === "DONE"
+                        ? "Hoàn tất"
+                        : "Thất bại"}
+                  </span>
+                </div>
+                {result.status === "DONE" && (
+                  <button
+                    type="button"
+                    onClick={handleShare}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-neutral-200 bg-white px-3 py-1.5 text-xs font-bold text-neutral-600 transition hover:bg-neutral-50 hover:border-neutral-300"
+                  >
+                    <Share2 size={14} />
+                    Chia sẻ
+                  </button>
+                )}
+              </div>
 
           {result.status === "PROCESSING" && (
             <div className="flex flex-col items-center justify-center py-8 px-4 text-center bg-green-50/30 rounded-2xl border border-green-100/50">
