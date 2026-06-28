@@ -39,7 +39,7 @@ export function FarmerHeader() {
             </Link>
             <Link href="/farmer/products" className="flex flex-col items-center group px-2 py-1 rounded-lg hover:bg-white/10 transition">
               <span className="text-sm">💊</span>
-              <span className="text-[9px] font-bold text-white/70 group-hover:text-white uppercase tracking-tighter">Thuốc</span>
+              <span className="text-[9px] font-bold text-white/70 group-hover:text-white uppercase tracking-tighter">Sản phẩm</span>
             </Link>
             <Link href="/farmer/orders" className="flex flex-col items-center group px-2 py-1 rounded-lg hover:bg-white/10 transition">
               <span className="text-sm">🛍️</span>

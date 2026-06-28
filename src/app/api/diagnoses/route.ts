@@ -53,8 +53,10 @@ export async function POST(request: NextRequest) {
       status: DiagnosisStatus.PROCESSING,
     },
   });
+  console.log(`[POST AI Diagnosis] Created ID: ${diagnosis.id} | User: ${user.id} | Crop: ${cropType}`);
 
   try {
+    console.log(`[POST AI Diagnosis] Start validation | ID: ${diagnosis.id} | Crop: ${cropType}`);
     const validationResult = await validateImagesWithGroq(
       base64ImagesSmall,
       cropType ?? undefined
@@ -70,8 +72,7 @@ export async function POST(request: NextRequest) {
         },
       });
       console.log(
-        `[AI Diagnosis Validation Failed] ID: ${diagnosis.id}`,
-        validationResult
+        `[POST AI Diagnosis] Validation FAILED | ID: ${diagnosis.id} | reasonCode: ${validationResult.reasonCode} | guidance: ${validationResult.userGuidance}`
       );
       return apiError(validationResult.userGuidance, 400);
     }
@@ -85,8 +86,9 @@ export async function POST(request: NextRequest) {
       `[AI Diagnosis Stage Check] ID: ${diagnosis.id}, Crop: ${cropType}, detectedStage: ${validationResult.detectedGrowthStage}, availableStages: ${availableStages.length}`
     );
 
-    // Nếu crop có giai đoạn, luôn hỏi user xác nhận vì AI có thể đoán sai.
-    if (!growthStage && availableStages.length > 0) {
+    // Luôn yêu cầu xác nhận giai đoạn khi loại cây có danh sách giai đoạn,
+    // bất kể AI validation có phát hiện được detectedGrowthStage hay không.
+    if (availableStages.length > 0) {
       const awaitingPayload = {
         awaitingStage: true,
         availableStages,
@@ -101,6 +103,9 @@ export async function POST(request: NextRequest) {
           status: DiagnosisStatus.DONE, // dừng polling, client tự xử lý
         },
       });
+      console.log(
+        `[POST AI Diagnosis] AWAITING_STAGE | ID: ${diagnosis.id} | Stages: ${availableStages.length} | Detected: ${validationResult.detectedGrowthStage} | Pest: ${validationResult.detectedPestDisease} | Severity: ${validationResult.detectedSeverityLevel}`
+      );
       return apiOk({
         id: diagnosis.id,
         status: "AWAITING_STAGE",
@@ -111,6 +116,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Chạy analysis
+    console.log(
+      `[POST AI Diagnosis] Start AI diagnosis | ID: ${diagnosis.id} | Crop: ${cropType} | Stage: ${growthStage ?? validationResult.detectedGrowthStage ?? "any"} | Pest: ${validationResult.detectedPestDisease ?? "any"} | Severity: ${validationResult.detectedSeverityLevel ?? "any"}`
+    );
     await runAiDiagnosis(
       diagnosis.id,
       base64Images,

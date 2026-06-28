@@ -63,7 +63,7 @@ type AwaitingStageInfo = {
   detectedGrowthStage?: string | null;
 };
 
-const ANALYSIS_PROGRESS_DURATION_MS = 90_000;
+const ANALYSIS_PROGRESS_DURATION_MS = 40_000;
 const NEED_CLEARER_IMAGE_MESSAGE =
   "Ảnh hiện tại chưa đủ rõ để hệ thống khoanh vùng chính xác. Bạn vui lòng chụp lại ảnh rõ hơn, gần vùng bệnh hơn và đủ ánh sáng nhé.";
 
@@ -525,16 +525,17 @@ export default function DiagnosePage() {
           detectedGrowthStage: data.detectedGrowthStage ?? null,
         });
         setResult({ id: data.id, status: "PROCESSING" });
+        setAnalyzeProgress(0);
+      } else if (data.status === "DONE" || data.suggestions) {
+        setResult(data);
         setLoading(false);
-        return;
+      } else {
+        setResult({ id: data.id, status: "PROCESSING" });
+        await pollResult(data.id);
+        setLoading(false);
       }
-
-      // AI detect được hoặc crop không có stages → poll bình thường
-      setResult({ id: data.id, status: "PROCESSING" });
-      await pollResult(data.id);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : NEED_CLEARER_IMAGE_MESSAGE);
-    } finally {
       setLoading(false);
     }
   }

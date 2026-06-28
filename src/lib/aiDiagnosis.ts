@@ -47,7 +47,7 @@ type GroqContentPart =
   | { type: "image_url"; image_url: { url: string } };
 type ReferenceData = { text: string; base64Image?: string | null };
 
-const MAX_REFERENCE_ITEMS = 5;
+const MAX_REFERENCE_ITEMS = 7;
 const DIAGNOSIS_TIMEOUT_MS = 90_000;
 export const NEED_CLEARER_IMAGE_MESSAGE =
   "Ảnh hiện tại chưa đủ rõ để hệ thống khoanh vùng chính xác. Bạn vui lòng chụp lại ảnh rõ hơn, gần vùng bệnh hơn và đủ ánh sáng nhé.";
@@ -560,22 +560,28 @@ async function analyzeWithFallback(
 ): Promise<AiDiagnosisResponse> {
   // 1st: Gemini
   try {
+    console.log("[AI Fallback] Trying Gemini...");
     const parsed = await analyzeWithGemini(prompt, userImages, referenceData);
+    console.log(`[AI Fallback] Gemini succeeded | Provider: gemini | Disease: ${parsed.disease} | Products: ${parsed.solutionSets?.length ?? 0} sets`);
     return { ...parsed, aiProvider: "gemini" };
   } catch (geminiError) {
-    console.error("[AI Diagnosis Gemini Error] Falling back to Groq", geminiError);
+    console.error("[AI Fallback] Gemini failed, trying Groq", geminiError);
   }
 
   // 2nd: Groq
   try {
+    console.log("[AI Fallback] Trying Groq...");
     const parsed = await analyzeWithGroq(prompt, userImages, referenceData);
+    console.log(`[AI Fallback] Groq succeeded | Provider: groq | Disease: ${parsed.disease} | Products: ${parsed.solutionSets?.length ?? 0} sets`);
     return { ...parsed, aiProvider: "groq", fallbackFrom: "gemini" };
   } catch (groqError) {
-    console.error("[AI Diagnosis Groq Error] Falling back to OpenRouter", groqError);
+    console.error("[AI Fallback] Groq failed, trying OpenRouter", groqError);
   }
 
   // 3rd: OpenRouter
+  console.log("[AI Fallback] Trying OpenRouter...");
   const parsed = await analyzeWithOpenRouter(prompt, userImages, referenceData);
+  console.log(`[AI Fallback] OpenRouter succeeded | Provider: openrouter | Disease: ${parsed.disease} | Products: ${parsed.solutionSets?.length ?? 0} sets`);
   return { ...parsed, aiProvider: "openrouter", fallbackFrom: "groq" };
 }
 
@@ -616,23 +622,17 @@ export async function runAiDiagnosis(
   console.log(
     `[AI Diagnosis Reference Data] ID: ${diagnosisId}, matched ${relevantDiseases.length} reference records`
   );
+  console.log(
+    `[AI Diagnosis Filter] ID: ${diagnosisId} | Crop: ${cropType} | Stage: ${growthStage} | Pest: ${pestDisease ?? "any"} | Severity: ${severityLevel ?? "any"} -> ${relevantDiseases.length} records`
+  );
 
   if (relevantDiseases.length > MAX_REFERENCE_ITEMS) {
     console.warn(
-      `[AI Diagnosis Needs Clearer Image] ID: ${diagnosisId}, reference records exceeded limit: ${relevantDiseases.length}`
+      `[AI Diagnosis Too Many References] ID: ${diagnosisId}, ${relevantDiseases.length} records -> randomly sampling ${MAX_REFERENCE_ITEMS}`
     );
-    await prisma.plantDiagnosis.update({
-      where: { id: diagnosisId },
-      data: {
-        rawAiResponse: {
-          reasonCode: "TOO_MANY_REFERENCE_ITEMS",
-          referenceItems: relevantDiseases.length,
-        },
-        summary: NEED_CLEARER_IMAGE_MESSAGE,
-        status: DiagnosisStatus.FAILED,
-      },
-    });
-    return;
+    relevantDiseases = relevantDiseases
+      .sort(() => Math.random() - 0.5)
+      .slice(0, MAX_REFERENCE_ITEMS);
   }
 
   const prompt = buildDiagnosisPromptText(cropType);
@@ -672,6 +672,9 @@ export async function runAiDiagnosis(
         reasonsMap[product.id] =
           parsed.reasons?.[pName] ||
           `Phù hợp với triệu chứng: ${parsed.disease}`;
+        console.log(`[AI Diagnosis Product Match] ID: ${diagnosisId} | AI name: "${pName}" -> matched product: ${product.id} (${product.name})`);
+      } else if (!product) {
+        console.warn(`[AI Diagnosis Product NOT Found] ID: ${diagnosisId} | AI name: "${pName}" not found in ${allProducts.length} active products`);
       }
     }
 

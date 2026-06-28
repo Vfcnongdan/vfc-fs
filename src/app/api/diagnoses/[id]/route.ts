@@ -80,6 +80,7 @@ export async function PATCH(
   // Kiểm tra trạng thái hợp lệ
   const awaitingPayload = diagnosis.rawAiResponse;
   if (!isAwaitingStagePayload(awaitingPayload)) {
+    console.log(`[PATCH AI Diagnosis] INVALID_STATE | ID: ${id} | rawAiResponse: ${JSON.stringify(awaitingPayload)}`);
     return apiError("INVALID_STATE", 400);
   }
 
@@ -91,6 +92,7 @@ export async function PATCH(
       rawAiResponse: { processingStage: growthStage },
     },
   });
+  console.log(`[PATCH AI Diagnosis] Start stage-confirmed diagnosis | ID: ${id} | Stage: ${growthStage}`);
 
   // Lấy lại base64 images — không lưu ảnh nên cần client gửi lại?
   // Không thể: ảnh không được lưu. Phải yêu cầu client re-upload.
@@ -101,6 +103,9 @@ export async function PATCH(
   }
 
   try {
+    console.log(
+      `[PATCH AI Diagnosis] Start AI diagnosis | ID: ${id} | Crop: ${diagnosis.cropType} | Stage: ${growthStage} | Pest: ${awaitingPayload.detectedPestDisease ?? "any"} | Severity: ${awaitingPayload.detectedSeverityLevel ?? "any"}`
+    );
     await runAiDiagnosis(
       id,
       base64Images,
@@ -110,7 +115,7 @@ export async function PATCH(
       awaitingPayload.detectedSeverityLevel ?? undefined
     );
   } catch (err) {
-    console.error("[PATCH AI Diagnosis Error]", err);
+    console.error(`[PATCH AI Diagnosis Error] | ID: ${id}`, err);
     await prisma.plantDiagnosis.update({
       where: { id },
       data: { status: DiagnosisStatus.FAILED },

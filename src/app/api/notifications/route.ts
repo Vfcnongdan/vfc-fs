@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     prisma.notification.findMany({
       where: { recipientId: user.id, isRead: false },
       orderBy: { createdAt: "desc" },
-      take: 10,
+      take: 50,
       include: {
         order: { select: { id: true, orderNumber: true, status: true } },
         cropChangeRequest: { select: { id: true, status: true } },
@@ -23,9 +23,26 @@ export async function GET(request: NextRequest) {
     }),
   ]);
 
+  const latestByOrder = new Map<string, (typeof notifications)[number]>();
+  const standalone: (typeof notifications)[number][] = [];
+
+  for (const n of notifications) {
+    if (n.orderId) {
+      if (!latestByOrder.has(n.orderId)) {
+        latestByOrder.set(n.orderId, n);
+      }
+    } else {
+      standalone.push(n);
+    }
+  }
+
+  const grouped = [...latestByOrder.values(), ...standalone].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  );
+
   return apiOk({
     unreadCount,
-    notifications: notifications.map((notification) => ({
+    notifications: grouped.map((notification) => ({
       id: notification.id,
       type: notification.type,
       title: notification.title,
