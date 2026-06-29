@@ -229,6 +229,7 @@ export default function DiagnosePage() {
     : result
       ? `result-${result.id}-${result.status}`
       : "";
+  const diagnosisImagePreview = previews[0];
 
   useEffect(() => {
     if (result?.status === "DONE" && canOrderRole) {
@@ -412,6 +413,12 @@ export default function DiagnosePage() {
       })
       .catch(() => {});
   }, [fetchUserCrops]);
+
+  useEffect(() => {
+    return () => {
+      previews.forEach((preview) => URL.revokeObjectURL(preview));
+    };
+  }, [previews]);
 
   // Kiểm tra trạng thái block từ localStorage mỗi giây
   useEffect(() => {
@@ -940,6 +947,24 @@ export default function DiagnosePage() {
 
           {result.status === "DONE" && result.summary && (
             <>
+              {diagnosisImagePreview && (
+                <div className="overflow-hidden rounded-2xl border border-green-100 bg-green-50/40 shadow-sm">
+                  <div className="border-b border-green-100 px-4 py-2">
+                    <p className="text-xs font-bold uppercase tracking-wider text-green-700">
+                      Ảnh triệu chứng đã gửi
+                    </p>
+                  </div>
+                  <div className="bg-white p-2">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={diagnosisImagePreview}
+                      alt="Ảnh triệu chứng cây trồng đã gửi"
+                      className="h-56 w-full rounded-xl object-cover sm:h-72"
+                    />
+                  </div>
+                </div>
+              )}
+
               {/* Highlighted Disease Diagnostic Box */}
               <div className="rounded-2xl border-l-4 border-red-500 bg-red-50/40 p-4 sm:p-5 shadow-sm transition hover:shadow-md">
                 {result.rawAiResponse?.disease &&
