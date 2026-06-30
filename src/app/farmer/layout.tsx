@@ -10,7 +10,7 @@ export default function FarmerLayout({ children }: { children: React.ReactNode }
       <FarmerHeader />
 
       {/* Content */}
-      <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-4">
+      <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-4 flex flex-col">
         {children}
       </main>
 
