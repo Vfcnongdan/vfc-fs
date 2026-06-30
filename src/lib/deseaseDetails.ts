@@ -3311,6 +3311,102 @@ export const planStageDesease: {
     "vfcSolution": "Opal 50WG",
     "actionThreshold": "Phun trị",
     "pestDensity": ""
+  },
+  {
+    "cropType": "Xoài",
+    "growthStage": "Ra hoa",
+    "pestDisease": "Bệnh",
+    "detail": "Thán thư",
+    "severityLevel": "Không có",
+    "imageUrl": "",
+    "description": "Cây xoài sinh trưởng bình thường, bông sáng, không có vết bệnh thán thư. Thời tiết thuận lợi, chưa có dấu hiệu nhiễm nấm Colletotrichum.",
+    "vfcSolution": "Phun phòng định kỳ bằng Amistar Top 325SC hoặc các sản phẩm chứa hoạt chất Mancozeb, Difenoconazole nhằm bảo vệ bông.",
+    "actionThreshold": "Theo dõi & Phun phòng",
+    "pestDensity": "0% tỷ lệ bông bị hại."
+  },
+  {
+    "cropType": "Xoài",
+    "growthStage": "Ra hoa",
+    "pestDisease": "Bệnh",
+    "detail": "Thán thư",
+    "severityLevel": "Nhẹ",
+    "imageUrl": "",
+    "description": "Xuất hiện các đốm đen nhỏ li ti trên sọc bông hoặc cuống hoa. Tỷ lệ bông bị hại thấp dưới 10%. Nấm bắt đầu tấn công khi có sương đêm hoặc mưa nhẹ.",
+    "vfcSolution": "Phun chặn ngay bằng Amistar Top 325SC hoặc Score 250EC để kiểm soát triệt để mầm bệnh.",
+    "actionThreshold": "Phun trị ngay",
+    "pestDensity": "Dưới 10% chùm hoa xuất hiện vết chấm đen."
+  },
+  {
+    "cropType": "Xoài",
+    "growthStage": "Ra hoa",
+    "pestDisease": "Bệnh",
+    "detail": "Thán thư",
+    "severityLevel": "Trung bình",
+    "imageUrl": "",
+    "description": "Vết bệnh đen lan rộng trên trục bông, làm một số hoa bị khô và rụng. Tỷ lệ chùm hoa bị nhiễm từ 10-30%. Nguy cơ gây thối bông và giảm tỷ lệ đậu trái cao.",
+    "vfcSolution": "Luân phiên hoặc phối hợp Amistar Top 325SC + Anvil 5SC để chặn đứng vết bệnh và giữ xanh bông.",
+    "actionThreshold": "Canh tác khẩn cấp & Phun trị",
+    "pestDensity": "10-30% trục chùm hoa bị thâm đen và khô."
+  },
+  {
+    "cropType": "Xoài",
+    "growthStage": "Ra hoa",
+    "pestDisease": "Bệnh",
+    "detail": "Thán thư",
+    "severityLevel": "Nặng",
+    "imageUrl": "",
+    "description": "Hầu hết các chùm hoa bị đen kịt, khô héo và rụng hàng loạt. Tỷ lệ hại trên 30%, bông bị cháy khô hoàn toàn, mất khả năng đậu trái nếu không can thiệp.",
+    "vfcSolution": "Phun kép (cách nhau 3-5 ngày): Sử dụng Amistar Top 325SC liều cao phối hợp cùng các hoạt chất trợ lực đặc trị thán thư.",
+    "actionThreshold": "Trị khẩn cấp",
+    "pestDensity": "Trên 30% chùm hoa bị cháy khô hoàn toàn."
+  },
+  {
+    "cropType": "Xoài",
+    "growthStage": "Nuôi trái",
+    "pestDisease": "Bệnh",
+    "detail": "Thán thư",
+    "severityLevel": "Không có",
+    "imageUrl": "https://drive.google.com/file/d/1AuYWC3uAgJrJLgakMadpDJ_o7qey0zsd/view?usp=drive_link",
+    "description": "Trái xoài sạch bệnh, da láng, không có vết chấm đen thán thư. Giai đoạn trái non đến phát triển kích thước ổn định.",
+    "vfcSolution": "Phun phòng trước các đợt mưa lớn bằng Amistar Top 325SC, tiến hành bao trái sau khi thuốc ráo để bảo vệ vỏ trái.",
+    "actionThreshold": "Bao trái & Phun phòng",
+    "pestDensity": "0% tỷ lệ trái bị hại."
+  },
+  {
+    "cropType": "Xoài",
+    "growthStage": "Nuôi trái",
+    "pestDisease": "Bệnh",
+    "detail": "Thán thư",
+    "severityLevel": "Nhẹ",
+    "imageUrl": "https://drive.google.com/file/d/1tHxEiHRMEXO3KBde1tG5HGDzxVF2AY1B/view?usp=drive_link",
+    "description": "Xuất hiện một vài chấm đen nhỏ, hơi lõm trên vỏ trái xoài. Thường tập trung ở phần chóp trái hoặc nơi đọng nước. Tỷ lệ trái nhiễm bệnh dưới 10%.",
+    "vfcSolution": "Phun Amistar Top 325SC hoặc sử dụng thuốc gốc đồng/Mancozeb để chặn đứng vết bệnh loang rộng trên vỏ trái.",
+    "actionThreshold": "Phun phòng trị vỏ trái",
+    "pestDensity": "Dưới 10% số trái trên cây có đốm đen nhỏ."
+  },
+  {
+    "cropType": "Xoài",
+    "growthStage": "Nuôi trái",
+    "pestDisease": "Bệnh",
+    "detail": "Thán thư",
+    "severityLevel": "Trung bình",
+    "imageUrl": "https://drive.google.com/file/d/1ImHaklmWP8Vx2jk12Bvr_k4wkrRugJL7/view?usp=drive_link",
+    "description": "Các vết đốm đen thâm lõm lan rộng thành từng mảng lớn, có thể xuất hiện vết nứt nhẹ trên vỏ trái. Tỷ lệ trái bị hại từ 10-30%, làm giảm mạnh phẩm cấp thương phẩm.",
+    "vfcSolution": "Phun phối hợp Amistar Top 325SC + Revus Opti nhằm tăng khả năng lưu dẫn sâu, cô lập và chặn đứng vết bệnh ăn sâu vào thịt trái.",
+    "actionThreshold": "Phun trị tích cực",
+    "pestDensity": "10-30% bề mặt vỏ trái hoặc số trái bị đốm đen loang lổ."
+  },
+  {
+    "cropType": "Xoài",
+    "growthStage": "Nuôi trái",
+    "pestDisease": "Bệnh",
+    "detail": "Thán thư",
+    "severityLevel": "Nặng",
+    "imageUrl": "https://drive.google.com/file/d/150eFEXlfEFRs02FcJpdS0IAFmMzaE2rk/view?usp=drive_link",
+    "description": "Vết bệnh thán thư bao phủ phần lớn vỏ trái, ăn sâu vào thịt trái gây thối rữa, chảy nước và rụng trái hàng loạt. Tỷ lệ hại trên 30%, thất thu năng suất nghiêm trọng.",
+    "vfcSolution": "Phun trị triệt để bằng Amistar Top 325SC phối hợp các dòng diệt nấm nội hấp liều cao; tiến hành thu gom và tiêu hủy toàn bộ trái rụng để tránh lây lan.",
+    "actionThreshold": "Trị khẩn cấp & Thu gom trái bệnh",
+    "pestDensity": "Trên 30% số trái bị thối loang đen và rụng."
   }
 ];
 
@@ -3387,4 +3483,10 @@ export const cropGrowthStageOptions: CropGrowthStageOptions[] = [
     pestDiseases: ["Bệnh", "Sâu"],
     severityLevels: ["Không có", "Nhẹ", "Trung bình", "Nặng"],
   },
+  {
+    cropType: "Xoài",
+    growthStages: ["Ra hoa", "Nuôi trái"],
+    pestDiseases: ["Bệnh", "Sâu"],
+    severityLevels: ["Không có", "Nhẹ", "Trung bình", "Nặng"],
+  }
 ];
