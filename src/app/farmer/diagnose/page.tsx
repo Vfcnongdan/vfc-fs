@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { captureElementToPng } from "@/lib/shareDiagnosis";
+import { includesStr } from "@/lib/utils";
 import {
   ProductMultiSelect,
   type MultiSelectProduct,
@@ -573,12 +574,15 @@ export default function DiagnosePage() {
 
       if (data.awaitingStage) {
         console.log("[Diagnose API] Awaiting stage, setting UI...");
-        setStageConfirmationDeclined(false);
-        setStageConfirmCountdown(30);
+        const detectedStage = data.detectedGrowthStage ?? null;
+        // Nếu AI không phát hiện được giai đoạn → hiển thị danh sách chọn ngay,
+        // không qua bước confirm "Có/Không"
+        setStageConfirmationDeclined(!detectedStage);
+        setStageConfirmCountdown(detectedStage ? 30 : 0);
         setAwaitingStage({
           diagnosisId: data.id,
           availableStages: data.availableStages ?? [],
-          detectedGrowthStage: data.detectedGrowthStage ?? null,
+          detectedGrowthStage: detectedStage,
         });
         setResult({ id: data.id, status: "PROCESSING" });
         setAnalyzeProgress(0);
@@ -1038,8 +1042,8 @@ export default function DiagnosePage() {
                         const isBestCombo = idx === 0; // Combo đầu tiên là tối ưu nhất
                         const matchedSuggestions = result.suggestions?.filter(s => 
                           s.product && set.products.some((pName: string) => 
-                            s.product!.name.toLowerCase().includes(pName.toLowerCase()) || 
-                            pName.toLowerCase().includes(s.product!.name.toLowerCase())
+                            includesStr(s.product!.name, pName) || 
+                            includesStr(pName, s.product!.name)
                           )
                         ) || [];
                         

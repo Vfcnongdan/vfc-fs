@@ -7,6 +7,7 @@ import {
   validateImagesWithGroq,
   runAiDiagnosis,
 } from "@/lib/aiDiagnosis";
+import { eqStr } from "@/lib/utils";
 
 export const maxDuration = 90;
 
@@ -79,7 +80,7 @@ export async function POST(request: NextRequest) {
 
     // Danh sách giai đoạn cho loại cây này
     const availableStages =
-      cropGrowthStageOptions.find((o) => o.cropType === cropType)
+      cropGrowthStageOptions.find((o) => eqStr(o.cropType, cropType))
         ?.growthStages ?? [];
 
     console.log(

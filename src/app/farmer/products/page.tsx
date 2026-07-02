@@ -5,6 +5,7 @@ import { Search, ShoppingCart, Plus, Minus } from "lucide-react";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { useCartStore } from "@/store/useCartStore";
+import { includesStr } from "@/lib/utils";
 
 type Product = {
   id: string;
@@ -34,12 +35,11 @@ export default function ProductsPage() {
 
   const filtered = useMemo(() => {
     if (!search.trim()) return products;
-    const q = search.toLowerCase();
     return products.filter(
       (p) =>
-        p.name.toLowerCase().includes(q) ||
-        p.category?.name.toLowerCase().includes(q) ||
-        p.detail?.targetDiseases?.toLowerCase().includes(q),
+        includesStr(p.name, search) ||
+        includesStr(p.category?.name, search) ||
+        includesStr(p.detail?.targetDiseases, search),
     );
   }, [products, search]);
 

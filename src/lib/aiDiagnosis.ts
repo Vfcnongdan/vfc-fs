@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { planStageDesease, cropGrowthStageOptions } from "@/lib/deseaseDetails";
 import { DiagnosisStatus } from "@prisma/client";
+import { eqStr, includesStr } from "@/lib/utils";
 
 type AiProvider = "gemini" | "groq" | "openrouter";
 
@@ -205,12 +206,10 @@ function parseImageValidationJson(
   }
 
   // Validate detectedGrowthStage — must be in allowedStages or null
-  // Use case-insensitive, trimmed comparison to handle minor AI output variations
   let detectedGrowthStage: string | null = null;
   if (parsed.isValid && parsed.detectedGrowthStage) {
-    const normalizedDetected = parsed.detectedGrowthStage.trim().toLowerCase();
     const matched = allowedStages.find(
-      (s) => s.trim().toLowerCase() === normalizedDetected
+      (s) => eqStr(s, parsed.detectedGrowthStage)
     );
     if (matched) {
       detectedGrowthStage = matched;
@@ -225,9 +224,8 @@ function parseImageValidationJson(
   // Validate detectedPestDisease
   let detectedPestDisease: string | null = null;
   if (parsed.isValid && parsed.detectedPestDisease) {
-    const normalizedDetected = parsed.detectedPestDisease.trim().toLowerCase();
     const matched = allowedPestDiseases.find(
-      (s) => s.trim().toLowerCase() === normalizedDetected
+      (s) => eqStr(s, parsed.detectedPestDisease)
     );
     if (matched) {
       detectedPestDisease = matched;
@@ -242,9 +240,8 @@ function parseImageValidationJson(
   // Validate detectedSeverityLevel
   let detectedSeverityLevel: string | null = null;
   if (parsed.isValid && parsed.detectedSeverityLevel) {
-    const normalizedDetected = parsed.detectedSeverityLevel.trim().toLowerCase();
     const matched = allowedSeverityLevels.find(
-      (s) => s.trim().toLowerCase() === normalizedDetected
+      (s) => eqStr(s, parsed.detectedSeverityLevel)
     );
     if (matched) {
       detectedSeverityLevel = matched;
@@ -301,7 +298,7 @@ export async function validateImagesWithGroq(
     );
   }
 
-  const cropOption = cropGrowthStageOptions.find((o) => o.cropType === cropType);
+  const cropOption = cropGrowthStageOptions.find((o) => eqStr(o.cropType, cropType));
   const allowedStages = cropOption?.growthStages ?? [];
   const allowedPestDiseases = cropOption?.pestDiseases ?? [];
   const allowedSeverityLevels = cropOption?.severityLevels ?? [];
@@ -604,18 +601,18 @@ export async function runAiDiagnosis(
 
   // Lọc dữ liệu đối chứng — thu hẹp dần theo từng tiêu chí có sẵn
   let relevantDiseases = planStageDesease.filter(
-    (d) => d.cropType === cropType && d.growthStage === growthStage
+    (d) => eqStr(d.cropType, cropType) && eqStr(d.growthStage, growthStage)
   );
 
   // Nếu detect được pestDisease → lọc tiếp, chỉ fallback nếu kết quả rỗng
   if (pestDisease) {
-    const filtered = relevantDiseases.filter((d) => d.pestDisease === pestDisease);
+    const filtered = relevantDiseases.filter((d) => eqStr(d.pestDisease, pestDisease));
     if (filtered.length > 0) relevantDiseases = filtered;
   }
 
   // Nếu detect được severityLevel → lọc tiếp, chỉ fallback nếu kết quả rỗng
   if (severityLevel) {
-    const filtered = relevantDiseases.filter((d) => d.severityLevel === severityLevel);
+    const filtered = relevantDiseases.filter((d) => eqStr(d.severityLevel, severityLevel));
     if (filtered.length > 0) relevantDiseases = filtered;
   }
 
@@ -664,8 +661,8 @@ export async function runAiDiagnosis(
     for (const pName of extractedProducts) {
       const product = allProducts.find(
         (p) =>
-          p.name.toLowerCase().includes(pName.toLowerCase()) ||
-          pName.toLowerCase().includes(p.name.toLowerCase())
+          includesStr(p.name, pName) ||
+          includesStr(pName, p.name)
       );
       if (product && !validProductIds.includes(product.id)) {
         validProductIds.push(product.id);
