@@ -575,8 +575,6 @@ export default function DiagnosePage() {
       if (data.awaitingStage) {
         console.log("[Diagnose API] Awaiting stage, setting UI...");
         const detectedStage = data.detectedGrowthStage ?? null;
-        // Nếu AI không phát hiện được giai đoạn → hiển thị danh sách chọn ngay,
-        // không qua bước confirm "Có/Không"
         setStageConfirmationDeclined(!detectedStage);
         setStageConfirmCountdown(detectedStage ? 30 : 0);
         setAwaitingStage({
@@ -586,6 +584,7 @@ export default function DiagnosePage() {
         });
         setResult({ id: data.id, status: "PROCESSING" });
         setAnalyzeProgress(0);
+        setLoading(false);
       } else if (data.status === "DONE" || data.suggestions) {
         setResult(data);
         setLoading(false);
