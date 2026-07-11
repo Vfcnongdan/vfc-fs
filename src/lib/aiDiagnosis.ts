@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { planStageDesease, cropGrowthStageOptions } from "@/lib/deseaseDetails";
+import { cropGrowthStageOptions } from "@/lib/deseaseDetails";
 import { DiagnosisStatus } from "@prisma/client";
 import { eqStr, includesStr } from "@/lib/utils";
 
@@ -599,20 +599,30 @@ export async function runAiDiagnosis(
     select: { id: true, name: true },
   });
 
-  // Lọc dữ liệu đối chứng — thu hẹp dần theo từng tiêu chí có sẵn
-  let relevantDiseases = planStageDesease.filter(
-    (d) => eqStr(d.cropType, cropType) && eqStr(d.growthStage, growthStage)
-  );
+  // Query dữ liệu đối chứng từ DB — thu hẹp dần theo từng tiêu chí có sẵn
+  const baseWhere = {
+    cropType: { equals: cropType, mode: "insensitive" as const },
+    growthStage: { equals: growthStage, mode: "insensitive" as const },
+  };
+
+  let relevantDiseases = await prisma.planStageDisease.findMany({ where: baseWhere });
 
   // Nếu detect được pestDisease → lọc tiếp, chỉ fallback nếu kết quả rỗng
   if (pestDisease) {
-    const filtered = relevantDiseases.filter((d) => eqStr(d.pestDisease, pestDisease));
+    const filtered = await prisma.planStageDisease.findMany({
+      where: { ...baseWhere, pestDisease: { equals: pestDisease, mode: "insensitive" } },
+    });
     if (filtered.length > 0) relevantDiseases = filtered;
   }
 
   // Nếu detect được severityLevel → lọc tiếp, chỉ fallback nếu kết quả rỗng
   if (severityLevel) {
-    const filtered = relevantDiseases.filter((d) => eqStr(d.severityLevel, severityLevel));
+    const pestWhere = pestDisease
+      ? { ...baseWhere, pestDisease: { equals: pestDisease, mode: "insensitive" as const } }
+      : baseWhere;
+    const filtered = await prisma.planStageDisease.findMany({
+      where: { ...pestWhere, severityLevel: { equals: severityLevel, mode: "insensitive" } },
+    });
     if (filtered.length > 0) relevantDiseases = filtered;
   }
 
@@ -638,9 +648,8 @@ export async function runAiDiagnosis(
     const referenceData: ReferenceData[] = [];
     for (const d of relevantDiseases) {
       let b64 = null;
-      if (d.imageUrl) {
-        const url = Array.isArray(d.imageUrl) ? d.imageUrl[0] : d.imageUrl;
-        b64 = await fetchAndOptimizeImage(url);
+      if (d.imageUrls && d.imageUrls.length > 0) {
+        b64 = await fetchAndOptimizeImage(d.imageUrls[0]);
       }
       const text = `- Bệnh: ${d.detail} (${d.pestDisease})\n- Mức độ: ${d.severityLevel}\n- Mô tả: ${d.description}\n- Giải pháp VFC: ${d.vfcSolution}`;
       referenceData.push({ text, base64Image: b64 });

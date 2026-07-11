@@ -5,6 +5,7 @@ import "dotenv/config";
 import * as fs from 'fs';
 import { parse } from 'csv-parse/sync';
 import path from 'path';
+import { planStageDiseaseSeedData } from './plan-stage-disease-seed-data';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
@@ -251,6 +252,36 @@ async function main() {
     console.log('Seeded product details successfully');
   } else {
     console.warn(`CSV file not found at ${csvFilePath}`);
+  }
+
+  // --- Seed Plan Stage Diseases (AI reference/training data) ---
+  // Backfills the plan_stage_diseases table used by runAiDiagnosis().
+  // Idempotent: only seeds when the table is empty so admin edits are never overwritten.
+  const existingPlanStageDiseases = await prisma.planStageDisease.count();
+  if (existingPlanStageDiseases > 0) {
+    console.log(
+      `Skipping plan stage disease seed: table already has ${existingPlanStageDiseases} records.`
+    );
+  } else {
+    const planStageData = planStageDiseaseSeedData.map((d) => ({
+      cropType: d.cropType,
+      growthStage: d.growthStage,
+      pestDisease: d.pestDisease,
+      detail: d.detail,
+      severityLevel: d.severityLevel,
+      imageUrls: Array.isArray(d.imageUrl)
+        ? d.imageUrl.filter(Boolean)
+        : d.imageUrl
+          ? [d.imageUrl]
+          : [],
+      description: d.description ?? '',
+      vfcSolution: d.vfcSolution ?? '',
+      actionThreshold: d.actionThreshold ?? '',
+      pestDensity: d.pestDensity ?? '',
+    }));
+
+    const result = await prisma.planStageDisease.createMany({ data: planStageData });
+    console.log(`Seeded ${result.count} plan stage disease records.`);
   }
 
   // --- Enable EarthDistance extension (always) ---

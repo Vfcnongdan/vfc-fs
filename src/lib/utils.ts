@@ -25,3 +25,30 @@ export const eqStr = (a?: string | null, b?: string | null): boolean => {
 export const includesStr = (container?: string | null, search?: string | null): boolean => {
   return normalizeStr(container ?? "").includes(normalizeStr(search ?? ""));
 };
+
+/**
+ * Converts Google Drive URLs to their embeddable preview version
+ */
+export const getPreviewUrl = (url: string) => {
+  if (!url || !url.includes("google.com")) return url;
+  
+  let id = "";
+  
+  // Match format: /file/d/ID/...
+  const fileMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (fileMatch) {
+    id = fileMatch[1];
+  } else {
+    // Match format: ?id=ID or &id=ID
+    const idMatch = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    if (idMatch) {
+      id = idMatch[1];
+    }
+  }
+
+  if (id) {
+    return `https://drive.google.com/thumbnail?id=${id}&sz=w1000`;
+  }
+
+  return url;
+};

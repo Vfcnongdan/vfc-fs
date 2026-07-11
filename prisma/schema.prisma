@@ -407,6 +407,27 @@ enum CropChangeRequestStatus {
   REJECTED
 }
 
+model PlanStageDisease {
+  id              String   @id @default(cuid())
+  cropType        String   @map("crop_type")
+  growthStage     String   @map("growth_stage")
+  pestDisease     String   @map("pest_disease")
+  detail          String
+  severityLevel   String   @map("severity_level")
+  imageUrls       String[] @map("image_urls")
+  description     String
+  vfcSolution     String   @map("vfc_solution")
+  actionThreshold String   @map("action_threshold")
+  pestDensity     String   @map("pest_density")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([cropType, growthStage])
+  @@index([cropType, growthStage, pestDisease])
+  @@index([cropType, growthStage, pestDisease, severityLevel])
+  @@map("plan_stage_diseases")
+}
+
 model Agency {
   id           String   @id @default(cuid())
   code         String   @unique
