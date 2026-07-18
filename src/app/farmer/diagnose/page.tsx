@@ -83,7 +83,7 @@ function ExpertContactBanner() {
           setContactName(data.name ?? null);
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   if (!zaloLink) return null;
@@ -378,7 +378,7 @@ export default function DiagnosePage() {
         navigator
           .share({
             title: "Kết quả chẩn đoán cây trồng - VFC",
-            text: result?.summary || "Kết quả chẩn đoán bệnh cây trồng từ VFC",
+            text: result?.summary || "Kết quả chẩn đoán dịch hại trên cây trồng từ VFC",
             files: [file],
           })
           .catch(() => {
@@ -412,7 +412,7 @@ export default function DiagnosePage() {
       .then((d) => {
         if (d.user) setUserProfile(d.user);
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [fetchUserCrops]);
 
   useEffect(() => {
@@ -429,7 +429,7 @@ export default function DiagnosePage() {
         try {
           const data = JSON.parse(dataStr);
           const today = new Date().toDateString();
-          
+
           // Reset nếu phát hiện sang ngày mới
           if (data.lastActiveDate && data.lastActiveDate !== today) {
             localStorage.removeItem("vfc_diagnose_rate_limit");
@@ -526,7 +526,7 @@ export default function DiagnosePage() {
         } else {
           limitData = { ...parsed, lastActiveDate: today };
         }
-      } catch {}
+      } catch { }
     } else {
       limitData.lastActiveDate = today;
     }
@@ -646,7 +646,7 @@ export default function DiagnosePage() {
         </span>
         <div>
           <h1 className="text-2xl font-bold text-neutral-800">
-            Chẩn đoán bệnh cây
+            Chẩn đoán dịch hại
           </h1>
           <p className="mt-1 text-sm text-neutral-500">
             Chụp hoặc chọn ảnh cây để AI phân tích
@@ -727,11 +727,10 @@ export default function DiagnosePage() {
               </div>
               <div
                 onClick={() => cropType && fileRef.current?.click()}
-                className={`group flex min-h-48 flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed p-4 text-center transition ${
-                  !cropType
+                className={`group flex min-h-48 flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed p-4 text-center transition ${!cropType
                     ? "cursor-not-allowed border-neutral-200 bg-neutral-50 opacity-70"
                     : "cursor-pointer border-green-300 bg-green-50/60 hover:border-green-500 hover:bg-green-50"
-                }`}
+                  }`}
               >
                 {previews.length > 0 ? (
                   <div className="flex w-full flex-col items-center gap-3">
@@ -752,11 +751,10 @@ export default function DiagnosePage() {
                 ) : (
                   <>
                     <span
-                      className={`flex h-14 w-14 items-center justify-center rounded-2xl ${
-                        cropType
+                      className={`flex h-14 w-14 items-center justify-center rounded-2xl ${cropType
                           ? "bg-white text-green-600 shadow-sm"
                           : "bg-neutral-100 text-neutral-400"
-                      }`}
+                        }`}
                     >
                       <ImagePlus className="h-7 w-7" aria-hidden="true" />
                     </span>
@@ -896,13 +894,12 @@ export default function DiagnosePage() {
                 <div className="flex items-center gap-2">
                   <span className="font-semibold">Kết quả</span>
                   <span
-                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                      result.status === "DONE"
+                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${result.status === "DONE"
                         ? "bg-green-100 text-green-700"
                         : result.status === "FAILED"
                           ? "bg-red-100 text-red-600"
                           : "bg-yellow-100 text-yellow-700"
-                    }`}
+                      }`}
                   >
                     {result.status === "PROCESSING"
                       ? "Đang xử lý..."
@@ -923,296 +920,293 @@ export default function DiagnosePage() {
                 )}
               </div>
 
-          {result.status === "PROCESSING" && (
-            <div className="flex flex-col items-center justify-center py-8 px-4 text-center bg-green-50/30 rounded-2xl border border-green-100/50">
-              <div className="relative mb-4">
-                <div className="h-12 w-12 animate-spin rounded-full border-4 border-green-500 border-t-transparent" />
-                <span className="absolute inset-0 flex items-center justify-center text-lg">
-                  🔍
-                </span>
-              </div>
-              <p className="text-base font-bold text-green-800 mb-1">
-                Đang chẩn đoán hình ảnh cây trồng...
-              </p>
-              <p className="max-w-md text-xs text-neutral-500 leading-relaxed">
-                Hệ thống đang quét triệu chứng qua AI và đối chiếu danh mục sản
-                phẩm của VFC. Quá trình này mất khoảng 5 - 10 giây, vui lòng
-                không tắt trình duyệt.
-              </p>
-            </div>
-          )}
-
-          {result.status === "FAILED" && (
-            <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium leading-relaxed text-red-700">
-              {result.summary || NEED_CLEARER_IMAGE_MESSAGE}
-            </div>
-          )}
-
-          {result.status === "DONE" && result.summary && (
-            <>
-              {diagnosisImagePreview && (
-                <div className="overflow-hidden rounded-2xl border border-green-100 bg-green-50/40 shadow-sm">
-                  <div className="border-b border-green-100 px-4 py-2">
-                    <p className="text-xs font-bold uppercase tracking-wider text-green-700">
-                      Ảnh triệu chứng đã gửi
-                    </p>
+              {result.status === "PROCESSING" && (
+                <div className="flex flex-col items-center justify-center py-8 px-4 text-center bg-green-50/30 rounded-2xl border border-green-100/50">
+                  <div className="relative mb-4">
+                    <div className="h-12 w-12 animate-spin rounded-full border-4 border-green-500 border-t-transparent" />
+                    <span className="absolute inset-0 flex items-center justify-center text-lg">
+                      🔍
+                    </span>
                   </div>
-                  <div className="bg-white p-2">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={diagnosisImagePreview}
-                      alt="Ảnh triệu chứng cây trồng đã gửi"
-                      className="h-56 w-full rounded-xl object-cover sm:h-72"
-                    />
-                  </div>
+                  <p className="text-base font-bold text-green-800 mb-1">
+                    Đang chẩn đoán hình ảnh cây trồng...
+                  </p>
+                  <p className="max-w-md text-xs text-neutral-500 leading-relaxed">
+                    Hệ thống đang quét triệu chứng qua AI và đối chiếu danh mục sản
+                    phẩm của VFC. Quá trình này mất khoảng 5 - 10 giây, vui lòng
+                    không tắt trình duyệt.
+                  </p>
                 </div>
               )}
 
-              {/* Highlighted Disease Diagnostic Box */}
-              <div className="rounded-2xl border-l-4 border-red-500 bg-red-50/40 p-4 sm:p-5 shadow-sm transition hover:shadow-md">
-                {result.rawAiResponse?.disease &&
-                  (() => {
-                    const diseaseStr = result.rawAiResponse.disease;
-                    const openParenIdx = diseaseStr.indexOf("(");
-                    let main = diseaseStr;
-                    let details = "";
-
-                    if (openParenIdx !== -1) {
-                      main = diseaseStr.slice(0, openParenIdx).trim();
-                      details = diseaseStr.slice(openParenIdx).trim();
-                    } else {
-                      const dashIdx = diseaseStr.indexOf(" - ");
-                      if (dashIdx !== -1) {
-                        main = diseaseStr.slice(0, dashIdx).trim();
-                        details = diseaseStr.slice(dashIdx + 3).trim();
-                      }
-                    }
-
-                    return (
-                      <div className="mb-2">
-                        <span className="inline-block text-[10px] font-bold uppercase tracking-wider text-red-600 bg-red-100 px-2 py-0.5 rounded-full">
-                          Kết quả Chẩn đoán bệnh
-                        </span>
-                        <h2 className="mt-1 text-xl sm:text-2xl font-black text-red-800 leading-tight">
-                          {main}
-                        </h2>
-                        {details && (
-                          <p className="mt-1.5 text-xs sm:text-sm text-neutral-600 font-medium italic leading-relaxed">
-                            {details}
-                          </p>
-                        )}
-                      </div>
-                    );
-                  })()}
-                {result.rawAiResponse?.severity && (
-                  <p className="text-sm font-bold text-neutral-700">
-                    Mức độ nghiêm trọng:{" "}
-                    <span className="font-bold text-red-600 px-2 py-0.5">
-                      {result.rawAiResponse.severity}
-                    </span>
-                  </p>
-                )}
-                <div className="mt-4 border-t border-neutral-200/60 pt-3">
-                  <p className="text-xs font-bold text-neutral-500 uppercase tracking-wider">
-                    Hướng xử lý đề xuất:
-                  </p>
-                  <p className="mt-1 text-sm text-neutral-600 leading-relaxed font-medium">
-                    {result.summary}
-                  </p>
+              {result.status === "FAILED" && (
+                <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium leading-relaxed text-red-700">
+                  {result.summary || NEED_CLEARER_IMAGE_MESSAGE}
                 </div>
-              </div>
+              )}
 
-              <ExpertContactBanner />
+              {result.status === "DONE" && result.summary && (
+                <>
+                  {diagnosisImagePreview && (
+                    <div className="overflow-hidden rounded-2xl border border-green-100 bg-green-50/40 shadow-sm">
+                      <div className="border-b border-green-100 px-4 py-2">
+                        <p className="text-xs font-bold uppercase tracking-wider text-green-700">
+                          Ảnh triệu chứng đã gửi
+                        </p>
+                      </div>
+                      <div className="bg-white p-2">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={diagnosisImagePreview}
+                          alt="Ảnh triệu chứng cây trồng đã gửi"
+                          className="h-56 w-full rounded-xl object-cover sm:h-72"
+                        />
+                      </div>
+                    </div>
+                  )}
 
-              {( (result.suggestions && result.suggestions.length > 0) || result.rawAiResponse?.vfcSolutionText ) && (
-                <div className="mt-4">
-                  <div className="flex items-center gap-2 mb-4">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100 text-green-600 text-base shadow-sm">
-                      ✨
-                    </span>
-                    <h3 className="text-lg font-bold text-green-800">
-                      Giải pháp VFC
-                    </h3>
+                  {/* Highlighted Disease Diagnostic Box */}
+                  <div className="rounded-2xl border-l-4 border-red-500 bg-red-50/40 p-4 sm:p-5 shadow-sm transition hover:shadow-md">
+                    {result.rawAiResponse?.disease &&
+                      (() => {
+                        const diseaseStr = result.rawAiResponse.disease;
+                        const openParenIdx = diseaseStr.indexOf("(");
+                        let main = diseaseStr;
+                        let details = "";
+
+                        if (openParenIdx !== -1) {
+                          main = diseaseStr.slice(0, openParenIdx).trim();
+                          details = diseaseStr.slice(openParenIdx).trim();
+                        } else {
+                          const dashIdx = diseaseStr.indexOf(" - ");
+                          if (dashIdx !== -1) {
+                            main = diseaseStr.slice(0, dashIdx).trim();
+                            details = diseaseStr.slice(dashIdx + 3).trim();
+                          }
+                        }
+
+                        return (
+                          <div className="mb-2">
+                            <span className="inline-block text-[10px] font-bold uppercase tracking-wider text-red-600 bg-red-100 px-2 py-0.5 rounded-full">
+                              Kết quả Chẩn đoán dịch hại
+                            </span>
+                            <h2 className="mt-1 text-xl sm:text-2xl font-black text-red-800 leading-tight">
+                              {main}
+                            </h2>
+                            {details && (
+                              <p className="mt-1.5 text-xs sm:text-sm text-neutral-600 font-medium italic leading-relaxed">
+                                {details}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    {result.rawAiResponse?.severity && (
+                      <p className="text-sm font-bold text-neutral-700">
+                        Mức độ nghiêm trọng:{" "}
+                        <span className="font-bold text-red-600 px-2 py-0.5">
+                          {result.rawAiResponse.severity}
+                        </span>
+                      </p>
+                    )}
+                    <div className="mt-4 border-t border-neutral-200/60 pt-3">
+                      <p className="text-xs font-bold text-neutral-500 uppercase tracking-wider">
+                        Hướng xử lý đề xuất:
+                      </p>
+                      <p className="mt-1 text-sm text-neutral-600 leading-relaxed font-medium">
+                        {result.summary}
+                      </p>
+                    </div>
                   </div>
 
-                  {result.rawAiResponse?.solutionSets && result.rawAiResponse.solutionSets.length > 0 ? (
-                    <div className="flex flex-col gap-6">
-                      {result.rawAiResponse.solutionSets.map((set, idx) => {
-                        const isBestCombo = idx === 0; // Combo đầu tiên là tối ưu nhất
-                        const matchedSuggestions = result.suggestions?.filter(s => 
-                          s.product && set.products.some((pName: string) => 
-                            includesStr(s.product!.name, pName) || 
-                            includesStr(pName, s.product!.name)
-                          )
-                        ) || [];
-                        
-                        if (matchedSuggestions.length === 0) return null;
-                        
-                        return (
-                          <div 
-                            key={idx} 
-                            className={`relative rounded-2xl p-5 shadow-sm transition-all duration-300 overflow-hidden ${
-                              isBestCombo
-                                ? "border-2 border-green-500 bg-gradient-to-br from-green-50/60 via-white to-green-100/30 hover:shadow-lg hover:border-green-600 scale-[1.01]"
-                                : "border border-neutral-200 bg-white hover:border-neutral-300 hover:shadow-md"
-                            }`}
-                          >
-                            {isBestCombo && (
-                              <div className="absolute top-0 right-0 rounded-bl-xl bg-green-600 px-3.5 py-1 text-[10px] font-extrabold uppercase tracking-wider text-white shadow-sm z-10">
-                                Combo Đề Xuất Tối Ưu
-                              </div>
-                            )}
+                  <ExpertContactBanner />
 
-                            <div className="flex items-center gap-2 mb-4">
-                              <h4 className={`font-black ${isBestCombo ? "text-green-800 text-lg sm:text-xl" : "text-neutral-800 text-base"}`}>
-                                {set.name}
-                              </h4>
-                            </div>
+                  {((result.suggestions && result.suggestions.length > 0) || result.rawAiResponse?.vfcSolutionText) && (
+                    <div className="mt-4">
+                      <div className="flex items-center gap-2 mb-4">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100 text-green-600 text-base shadow-sm">
+                          ✨
+                        </span>
+                        <h3 className="text-lg font-bold text-green-800">
+                          Giải pháp VFC
+                        </h3>
+                      </div>
 
-                            <div className="flex flex-col gap-4 relative z-0">
-                              {matchedSuggestions.map((s) => {
-                                return (
-                                  <div
-                                    key={s.product?.id || s.rank}
-                                    className="flex flex-col sm:flex-row gap-4 bg-white/60 backdrop-blur-sm rounded-xl p-4 border border-neutral-100/80 shadow-sm"
-                                  >
-                                    <div className="mx-auto sm:mx-0 flex-shrink-0 h-24 w-24 rounded-xl bg-white border border-neutral-100 p-2 flex items-center justify-center shadow-sm">
-                                      {s.product?.imageUrls?.[0] ? (
-                                        <img
-                                          src={s.product.imageUrls[0]}
-                                          alt={s.product.name}
-                                          className="max-h-full max-w-full object-contain"
-                                        />
-                                      ) : (
-                                        <div className="flex h-full w-full items-center justify-center rounded-lg bg-neutral-50 text-2xl">
-                                          🧪
-                                        </div>
-                                      )}
-                                    </div>
+                      {result.rawAiResponse?.solutionSets && result.rawAiResponse.solutionSets.length > 0 ? (
+                        <div className="flex flex-col gap-6">
+                          {result.rawAiResponse.solutionSets.map((set, idx) => {
+                            const isBestCombo = idx === 0; // Combo đầu tiên là tối ưu nhất
+                            const matchedSuggestions = result.suggestions?.filter(s =>
+                              s.product && set.products.some((pName: string) =>
+                                includesStr(s.product!.name, pName) ||
+                                includesStr(pName, s.product!.name)
+                              )
+                            ) || [];
 
-                                    <div className="flex-1 min-w-0 flex flex-col justify-between gap-2 text-center sm:text-left">
-                                      <div>
-                                        <p className="font-bold text-neutral-800 text-base">
-                                          {s.product?.name ?? "Sản phẩm"}
-                                        </p>
-                                      </div>
+                            if (matchedSuggestions.length === 0) return null;
 
-                                      <div className="rounded-xl p-2.5 text-left bg-neutral-50 border border-neutral-100">
-                                        <p className="text-sm leading-relaxed text-neutral-600">
-                                          {s.reason}
-                                        </p>
-                                      </div>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-
-                            {canOrderRole && (
-                              <button
-                                type="button"
-                                onClick={() => handleOpenComboOrder({
-                                  name: set.name,
-                                  products: matchedSuggestions
-                                    .filter((s) => s.product)
-                                    .map((s) => ({ id: s.product!.id, name: s.product!.name, imageUrls: s.product!.imageUrls })),
-                                })}
-                                className="mt-4 w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-sm hover:shadow transition duration-200"
+                            return (
+                              <div
+                                key={idx}
+                                className={`relative rounded-2xl p-5 shadow-sm transition-all duration-300 overflow-hidden ${isBestCombo
+                                    ? "border-2 border-green-500 bg-gradient-to-br from-green-50/60 via-white to-green-100/30 hover:shadow-lg hover:border-green-600 scale-[1.01]"
+                                    : "border border-neutral-200 bg-white hover:border-neutral-300 hover:shadow-md"
+                                  }`}
                               >
-                                Đặt hàng bộ giải pháp
-                              </button>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="flex flex-col gap-4">
-                      {result.suggestions?.map((s) => {
-                        const isBestMatch = s.rank === 1;
-                        return (
-                          <div
-                            key={s.rank}
-                            className={`relative flex flex-col sm:flex-row gap-4 sm:gap-6 rounded-2xl p-5 shadow-sm transition-all duration-300 overflow-hidden ${
-                              isBestMatch
-                                ? "border-2 border-green-500 bg-gradient-to-br from-green-50/60 via-white to-green-100/30 hover:shadow-lg hover:border-green-600 scale-[1.01]"
-                                : "border border-neutral-200 bg-white hover:border-neutral-300 hover:shadow-md"
-                            }`}
-                          >
-                            <div
-                              className={`mx-auto sm:mx-0 flex-shrink-0 rounded-xl bg-white border border-neutral-100 p-2 ${
-                                isBestMatch ? "h-28 w-28" : "h-20 w-20"
-                              } flex items-center justify-center shadow-sm`}
-                            >
-                              {s.product?.imageUrls?.[0] ? (
-                                <img
-                                  src={s.product.imageUrls[0]}
-                                  alt={s.product.name}
-                                  className="max-h-full max-w-full object-contain"
-                                />
-                              ) : (
-                                <div className="flex h-full w-full items-center justify-center rounded-lg bg-neutral-50 text-2xl">
-                                  🧪
-                                </div>
-                              )}
-                            </div>
+                                {isBestCombo && (
+                                  <div className="absolute top-0 right-0 rounded-bl-xl bg-green-600 px-3.5 py-1 text-[10px] font-extrabold uppercase tracking-wider text-white shadow-sm z-10">
+                                    Combo Đề Xuất Tối Ưu
+                                  </div>
+                                )}
 
-                            <div className="flex-1 min-w-0 flex flex-col justify-between gap-3 text-center sm:text-left">
-                              <div>
-                                <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 flex-wrap justify-center sm:justify-start">
-                                  <p
-                                    className={`font-black text-neutral-800 ${isBestMatch ? "text-lg sm:text-xl" : "text-base"}`}
+                                <div className="flex items-center gap-2 mb-4">
+                                  <h4 className={`font-black ${isBestCombo ? "text-green-800 text-lg sm:text-xl" : "text-neutral-800 text-base"}`}>
+                                    {set.name}
+                                  </h4>
+                                </div>
+
+                                <div className="flex flex-col gap-4 relative z-0">
+                                  {matchedSuggestions.map((s) => {
+                                    return (
+                                      <div
+                                        key={s.product?.id || s.rank}
+                                        className="flex flex-col sm:flex-row gap-4 bg-white/60 backdrop-blur-sm rounded-xl p-4 border border-neutral-100/80 shadow-sm"
+                                      >
+                                        <div className="mx-auto sm:mx-0 flex-shrink-0 h-24 w-24 rounded-xl bg-white border border-neutral-100 p-2 flex items-center justify-center shadow-sm">
+                                          {s.product?.imageUrls?.[0] ? (
+                                            <img
+                                              src={s.product.imageUrls[0]}
+                                              alt={s.product.name}
+                                              className="max-h-full max-w-full object-contain"
+                                            />
+                                          ) : (
+                                            <div className="flex h-full w-full items-center justify-center rounded-lg bg-neutral-50 text-2xl">
+                                              🧪
+                                            </div>
+                                          )}
+                                        </div>
+
+                                        <div className="flex-1 min-w-0 flex flex-col justify-between gap-2 text-center sm:text-left">
+                                          <div>
+                                            <p className="font-bold text-neutral-800 text-base">
+                                              {s.product?.name ?? "Sản phẩm"}
+                                            </p>
+                                          </div>
+
+                                          <div className="rounded-xl p-2.5 text-left bg-neutral-50 border border-neutral-100">
+                                            <p className="text-sm leading-relaxed text-neutral-600">
+                                              {s.reason}
+                                            </p>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+
+                                {canOrderRole && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenComboOrder({
+                                      name: set.name,
+                                      products: matchedSuggestions
+                                        .filter((s) => s.product)
+                                        .map((s) => ({ id: s.product!.id, name: s.product!.name, imageUrls: s.product!.imageUrls })),
+                                    })}
+                                    className="mt-4 w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-sm hover:shadow transition duration-200"
                                   >
-                                    {s.product?.name ?? "Sản phẩm"}
-                                  </p>
-                                {isBestMatch && (
-                                  <span className="inline-block mx-auto sm:mx-0 rounded-full bg-green-200/60 px-2.5 py-0.5 text-[10px] font-black text-green-800 uppercase tracking-wider">
-                                    Đề xuất tối ưu
-                                  </span>
+                                    Đặt hàng bộ giải pháp
+                                  </button>
                                 )}
                               </div>
-                              </div>
-
-                              <div
-                                className={`rounded-xl p-3 text-left ${isBestMatch ? "bg-green-100/40 border border-green-200/30" : "bg-neutral-50 border border-neutral-100"}`}
-                              >
-                                <p
-                                  className={`text-sm leading-relaxed ${isBestMatch ? "font-semibold text-green-900" : "text-neutral-600"}`}
-                                >
-                                  {s.reason}
-                                </p>
-                              </div>
-                            </div>
-
-                            {isBestMatch && (
-                              <div className="absolute top-0 right-0 rounded-bl-xl bg-green-600 px-3.5 py-1 text-[10px] font-extrabold uppercase tracking-wider text-white shadow-sm">
-                                Phù hợp nhất
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-
-                      {canOrderRole && result.suggestions && result.suggestions.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => handleOpenComboOrder({
-                            name: "Giải pháp đề xuất",
-                            products: result.suggestions!
-                              .filter((s) => s.product)
-                              .map((s) => ({ id: s.product!.id, name: s.product!.name, imageUrls: s.product!.imageUrls })),
+                            );
                           })}
-                          className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-sm hover:shadow transition duration-200"
-                        >
-                          Đặt hàng bộ giải pháp
-                        </button>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col gap-4">
+                          {result.suggestions?.map((s) => {
+                            const isBestMatch = s.rank === 1;
+                            return (
+                              <div
+                                key={s.rank}
+                                className={`relative flex flex-col sm:flex-row gap-4 sm:gap-6 rounded-2xl p-5 shadow-sm transition-all duration-300 overflow-hidden ${isBestMatch
+                                    ? "border-2 border-green-500 bg-gradient-to-br from-green-50/60 via-white to-green-100/30 hover:shadow-lg hover:border-green-600 scale-[1.01]"
+                                    : "border border-neutral-200 bg-white hover:border-neutral-300 hover:shadow-md"
+                                  }`}
+                              >
+                                <div
+                                  className={`mx-auto sm:mx-0 flex-shrink-0 rounded-xl bg-white border border-neutral-100 p-2 ${isBestMatch ? "h-28 w-28" : "h-20 w-20"
+                                    } flex items-center justify-center shadow-sm`}
+                                >
+                                  {s.product?.imageUrls?.[0] ? (
+                                    <img
+                                      src={s.product.imageUrls[0]}
+                                      alt={s.product.name}
+                                      className="max-h-full max-w-full object-contain"
+                                    />
+                                  ) : (
+                                    <div className="flex h-full w-full items-center justify-center rounded-lg bg-neutral-50 text-2xl">
+                                      🧪
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="flex-1 min-w-0 flex flex-col justify-between gap-3 text-center sm:text-left">
+                                  <div>
+                                    <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 flex-wrap justify-center sm:justify-start">
+                                      <p
+                                        className={`font-black text-neutral-800 ${isBestMatch ? "text-lg sm:text-xl" : "text-base"}`}
+                                      >
+                                        {s.product?.name ?? "Sản phẩm"}
+                                      </p>
+                                      {isBestMatch && (
+                                        <span className="inline-block mx-auto sm:mx-0 rounded-full bg-green-200/60 px-2.5 py-0.5 text-[10px] font-black text-green-800 uppercase tracking-wider">
+                                          Đề xuất tối ưu
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  <div
+                                    className={`rounded-xl p-3 text-left ${isBestMatch ? "bg-green-100/40 border border-green-200/30" : "bg-neutral-50 border border-neutral-100"}`}
+                                  >
+                                    <p
+                                      className={`text-sm leading-relaxed ${isBestMatch ? "font-semibold text-green-900" : "text-neutral-600"}`}
+                                    >
+                                      {s.reason}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                {isBestMatch && (
+                                  <div className="absolute top-0 right-0 rounded-bl-xl bg-green-600 px-3.5 py-1 text-[10px] font-extrabold uppercase tracking-wider text-white shadow-sm">
+                                    Phù hợp nhất
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+
+                          {canOrderRole && result.suggestions && result.suggestions.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenComboOrder({
+                                name: "Giải pháp đề xuất",
+                                products: result.suggestions!
+                                  .filter((s) => s.product)
+                                  .map((s) => ({ id: s.product!.id, name: s.product!.name, imageUrls: s.product!.imageUrls })),
+                              })}
+                              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-sm hover:shadow transition duration-200"
+                            >
+                              Đặt hàng bộ giải pháp
+                            </button>
+                          )}
+                        </div>
                       )}
                     </div>
                   )}
-                </div>
+                </>
               )}
-            </>
-          )}
             </div>
           )}
         </div>

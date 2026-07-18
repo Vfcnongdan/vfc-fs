@@ -159,7 +159,7 @@ export default function AITrainingPage() {
   const [importMode, setImportMode] = useState<"skip" | "override">("skip");
   const [importing, setImporting] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
-  
+
   // Form state
   const [formData, setFormData] = useState({
     cropType: "",
@@ -173,6 +173,14 @@ export default function AITrainingPage() {
     actionThreshold: "",
     pestDensity: "",
   });
+
+  const formCropOption = useMemo(
+    () => cropGrowthStageOptions.find((o) => eqStr(o.cropType, formData.cropType)),
+    [formData.cropType],
+  );
+  const formStageOptions = formCropOption?.growthStages ?? [];
+  const formPestOptions = formCropOption?.pestDiseases ?? [];
+  const formSeverityOptions = formCropOption?.severityLevels ?? [];
 
   useEffect(() => {
     // Fetch crops for dropdown
@@ -319,12 +327,12 @@ export default function AITrainingPage() {
       if (res.ok) {
         toast.success(
           `Import xong: thêm ${resData.inserted} bản ghi` +
-            (resData.deleted ? `, đã xóa ${resData.deleted}` : "") +
-            (resData.skippedExisting ? `, bỏ ${resData.skippedExisting} trùng DB` : "") +
-            (resData.skippedDuplicateInFile
-              ? `, bỏ ${resData.skippedDuplicateInFile} trùng trong tệp`
-              : "") +
-            (resData.skippedInvalid ? `, bỏ ${resData.skippedInvalid} dòng lỗi` : ""),
+          (resData.deleted ? `, đã xóa ${resData.deleted}` : "") +
+          (resData.skippedExisting ? `, bỏ ${resData.skippedExisting} trùng DB` : "") +
+          (resData.skippedDuplicateInFile
+            ? `, bỏ ${resData.skippedDuplicateInFile} trùng trong tệp`
+            : "") +
+          (resData.skippedInvalid ? `, bỏ ${resData.skippedInvalid} dòng lỗi` : ""),
           { duration: 6000 },
         );
         setIsImportOpen(false);
@@ -382,7 +390,7 @@ export default function AITrainingPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">AI Training (Reference Data)</h1>
-          <p className="mt-1 text-sm text-gray-500">Quản lý dữ liệu đối chứng hỗ trợ AI chẩn đoán bệnh cây trồng.</p>
+          <p className="mt-1 text-sm text-gray-500">Quản lý dữ liệu đối chứng hỗ trợ AI chẩn đoán dịch hại cây trồng.</p>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -420,7 +428,7 @@ export default function AITrainingPage() {
               ))}
             </select>
           </div>
-          
+
           <MultiSelectDropdown
             label="Giai đoạn"
             options={stageOptions}
@@ -496,53 +504,87 @@ export default function AITrainingPage() {
                   </td>
                 </tr>
               ) : (
-                data.map((item) => (
-                  <tr key={item.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">{item.cropType}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.growthStage}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.pestDisease}</td>
-                    <td className="px-6 py-4 text-sm text-gray-500 max-w-[200px] truncate" title={item.detail}>{item.detail}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <span className="inline-flex rounded-full bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">
-                        {item.severityLevel}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-500 max-w-[150px]">
-                      {item.imageUrls && item.imageUrls.length > 0 ? (
-                        <div className="flex flex-col gap-1">
-                          {item.imageUrls.map((url, idx) => (
-                            <div key={idx} className="group relative">
-                              <a 
-                                href={url} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="block w-full truncate text-blue-600 hover:underline"
-                                title={url}
-                              >
-                                {url}
-                              </a>
-                              {/* Tooltip Image Preview */}
-                              <div className="hidden group-hover:block absolute z-50 left-0 bottom-full mb-2 p-1 bg-white border border-gray-200 rounded-lg shadow-xl">
-                                <img src={getPreviewUrl(url)} alt="Preview" className="h-40 w-auto max-w-[300px] object-contain rounded" />
+                data.map((item) => {
+                  const missingFields: string[] = [];
+                  if (!item.cropType) missingFields.push("Cây trồng");
+                  if (!item.growthStage) missingFields.push("Giai đoạn");
+                  if (!item.pestDisease) missingFields.push("Dịch hại");
+                  if (!item.detail) missingFields.push("Chi tiết dịch hại");
+                  if (!item.severityLevel) missingFields.push("Cấp độ");
+                  if (!item.imageUrls || item.imageUrls.length === 0) missingFields.push("Hình ảnh");
+                  if (!item.description) missingFields.push("Mô tả dấu hiệu");
+                  if (!item.vfcSolution) missingFields.push("Giải pháp VFC");
+                  if (!item.actionThreshold) missingFields.push("Ngưỡng hành động");
+                  if (!item.pestDensity) missingFields.push("Mật độ dịch hại");
+                  const hasMissing = missingFields.length > 0;
+
+                  return (
+                    <tr key={item.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
+                        <div className="flex items-center gap-2">
+                          {hasMissing && (
+                            <div className="group relative flex-shrink-0">
+                              <span className="block h-2.5 w-2.5 rounded-full bg-yellow-400 cursor-default" />
+                              <div className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 z-50 hidden group-hover:block">
+                                <div className="rounded-md bg-gray-900 px-3 py-2 shadow-lg" style={{ minWidth: '180px' }}>
+                                  <p className="mb-1 text-xs font-semibold text-yellow-400">Thiếu dữ liệu:</p>
+                                  <ul className="space-y-0.5">
+                                    {missingFields.map((f) => (
+                                      <li key={f} className="text-xs text-gray-200">• {f}</li>
+                                    ))}
+                                  </ul>
+                                </div>
                               </div>
                             </div>
-                          ))}
+                          )}
+                          {item.cropType}
                         </div>
-                      ) : (
-                        <span className="text-gray-400 italic">Không có</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <button onClick={() => handleOpenEditModal(item)} className="text-[#064E3B] hover:text-[#064E3B]/80 mr-4">Sửa</button>
-                      <button onClick={() => handleDelete(item.id)} className="text-red-600 hover:text-red-900">Xóa</button>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.growthStage}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.pestDisease}</td>
+                      <td className="px-6 py-4 text-sm text-gray-500 max-w-[200px] truncate" title={item.detail}>{item.detail}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <span className="inline-flex rounded-full bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">
+                          {item.severityLevel}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-500 max-w-[150px]">
+                        {item.imageUrls && item.imageUrls.length > 0 ? (
+                          <div className="flex flex-col gap-1">
+                            {item.imageUrls.map((url, idx) => (
+                              <div key={idx} className="group relative">
+                                <a
+                                  href={url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="block w-full truncate text-blue-600 hover:underline"
+                                  title={url}
+                                >
+                                  {url}
+                                </a>
+                                {/* Tooltip Image Preview */}
+                                <div className="hidden group-hover:block absolute z-50 left-0 bottom-full mb-2 p-1 bg-white border border-gray-200 rounded-lg shadow-xl">
+                                  <img src={getPreviewUrl(url)} alt="Preview" className="h-40 w-auto max-w-[300px] object-contain rounded" />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 italic">Không có</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button onClick={() => handleOpenEditModal(item)} className="text-[#064E3B] hover:text-[#064E3B]/80 mr-4">Sửa</button>
+                        <button onClick={() => handleDelete(item.id)} className="text-red-600 hover:text-red-900">Xóa</button>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
-        
+
         {totalPages > 1 && (
           <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6">
             <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
@@ -588,53 +630,78 @@ export default function AITrainingPage() {
                 </svg>
               </button>
             </div>
-            
+
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1.5">
                   <label className="text-sm font-medium text-gray-700">Cây trồng *</label>
-                  <input
+                  <select
                     required
-                    type="text"
                     value={formData.cropType}
-                    onChange={(e) => setFormData({ ...formData, cropType: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({
+                        ...formData,
+                        cropType: e.target.value,
+                        growthStage: "",
+                        pestDisease: "",
+                        severityLevel: "",
+                      });
+                    }}
                     className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[#064E3B] focus:outline-none focus:ring-1 focus:ring-[#064E3B]"
-                  />
+                  >
+                    <option value="">-- Chọn cây trồng --</option>
+                    {crops.map((c) => (
+                      <option key={c.id} value={c.name}>{c.name}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <label className="text-sm font-medium text-gray-700">Giai đoạn *</label>
-                  <input
+                  <select
                     required
-                    type="text"
                     value={formData.growthStage}
                     onChange={(e) => setFormData({ ...formData, growthStage: e.target.value })}
                     className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[#064E3B] focus:outline-none focus:ring-1 focus:ring-[#064E3B]"
-                  />
+                    disabled={!formData.cropType}
+                  >
+                    <option value="">-- Chọn giai đoạn --</option>
+                    {formStageOptions.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1.5">
                   <label className="text-sm font-medium text-gray-700">Dịch hại (Nhóm) *</label>
-                  <input
+                  <select
                     required
-                    type="text"
-                    placeholder="VD: Sâu, Bệnh"
                     value={formData.pestDisease}
                     onChange={(e) => setFormData({ ...formData, pestDisease: e.target.value })}
                     className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[#064E3B] focus:outline-none focus:ring-1 focus:ring-[#064E3B]"
-                  />
+                    disabled={!formData.cropType}
+                  >
+                    <option value="">-- Chọn dịch hại --</option>
+                    {formPestOptions.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <label className="text-sm font-medium text-gray-700">Cấp độ *</label>
-                  <input
+                  <select
                     required
-                    type="text"
-                    placeholder="VD: Nhẹ, Nặng"
                     value={formData.severityLevel}
                     onChange={(e) => setFormData({ ...formData, severityLevel: e.target.value })}
                     className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[#064E3B] focus:outline-none focus:ring-1 focus:ring-[#064E3B]"
-                  />
+                    disabled={!formData.cropType}
+                  >
+                    <option value="">-- Chọn cấp độ --</option>
+                    {formSeverityOptions.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
