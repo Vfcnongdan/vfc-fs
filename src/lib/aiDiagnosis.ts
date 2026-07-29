@@ -3,7 +3,7 @@ import { cropGrowthStageOptions } from "@/lib/deseaseDetails";
 import { DiagnosisStatus } from "@prisma/client";
 import { eqStr, includesStr } from "@/lib/utils";
 
-type AiProvider = "gemini" | "groq" | "openrouter";
+type AiProvider = "gemini" | "openrouter";
 
 export type ImageValidationReasonCode =
   | "VALID"
@@ -43,7 +43,7 @@ export type AiDiagnosisResponse = {
 type GeminiContentPart =
   | { text: string }
   | { inlineData: { data: string; mimeType: "image/jpeg" } };
-type GroqContentPart =
+type OpenAIContentPart =
   | { type: "text"; text: string }
   | { type: "image_url"; image_url: { url: string } };
 type ReferenceData = { text: string; base64Image?: string | null };
@@ -85,7 +85,9 @@ export async function fetchAndOptimizeImage(url: string): Promise<string | null>
 }
 
 function parseJsonBlock(text: string, provider: string) {
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  // Strip <think>...</think> blocks từ các reasoning model trước khi parse
+  const stripped = text.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+  const jsonMatch = stripped.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
     console.error(
       `[AI Parse Error] No JSON block found in ${provider} response. Raw text:`,
@@ -122,7 +124,7 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   });
 }
 
-// ─── Image Validation (Groq) ─────────────────────────────────────────────────
+// ─── Image Validation (OpenRouter) ───────────────────────────────────────────
 
 function buildImageValidationPrompt(
   cropType: string | undefined,
@@ -172,7 +174,7 @@ function parseImageValidationJson(
   allowedPestDiseases: string[],
   allowedSeverityLevels: string[]
 ): ImageValidationResponse {
-  const parsed = parseJsonBlock(text, "groq-plan-validation") as Partial<
+  const parsed = parseJsonBlock(text, "image-validation") as Partial<
     ImageValidationResponse & {
       detectedGrowthStage?: string | null;
       detectedPestDisease?: string | null;
@@ -181,7 +183,7 @@ function parseImageValidationJson(
   >;
 
   if (typeof parsed.isValid !== "boolean") {
-    throw new Error("Groq plan validation returned invalid isValid value");
+    throw new Error("Image validation returned invalid isValid value");
   }
   if (
     parsed.reasonCode !== "VALID" &&
@@ -189,19 +191,19 @@ function parseImageValidationJson(
     parsed.reasonCode !== "WRONG_CROP" &&
     parsed.reasonCode !== "BLURRY_IMAGE"
   ) {
-    throw new Error("Groq plan validation returned invalid reasonCode value");
+    throw new Error("Image validation returned invalid reasonCode value");
   }
   if (typeof parsed.userGuidance !== "string") {
-    throw new Error("Groq plan validation returned invalid userGuidance value");
+    throw new Error("Image validation returned invalid userGuidance value");
   }
   if (parsed.isValid && parsed.reasonCode !== "VALID") {
     throw new Error(
-      "Groq plan validation returned inconsistent isValid and reasonCode"
+      "Image validation returned inconsistent isValid and reasonCode"
     );
   }
   if (!parsed.isValid && parsed.reasonCode === "VALID") {
     throw new Error(
-      "Groq plan validation returned inconsistent invalid VALID response"
+      "Image validation returned inconsistent invalid VALID response"
     );
   }
 
@@ -288,13 +290,15 @@ export async function validateImagesWithGroq(
   base64Images: string[],
   cropType?: string
 ): Promise<ImageValidationResponse> {
-  const hasApiKey = !!process.env.GROQ_API_KEY_PLAN_VALIDATION;
+  const apiKey =
+    process.env.OPENROUTER_API_VALIDATION_KEY || process.env.OPENROUTER_API_KEY;
+  const hasApiKey = !!apiKey;
   console.log(
-    `[AI Plan Validation Groq API Key Check] Key exists: ${hasApiKey}`
+    `[AI Plan Validation OpenRouter API Key Check] Key exists: ${hasApiKey}`
   );
   if (!hasApiKey) {
     throw new Error(
-      "GROQ_API_KEY_PLAN_VALIDATION is not defined in environment variables"
+      "OPENROUTER_API_VALIDATION_KEY is not defined in environment variables"
     );
   }
 
@@ -303,10 +307,7 @@ export async function validateImagesWithGroq(
   const allowedPestDiseases = cropOption?.pestDiseases ?? [];
   const allowedSeverityLevels = cropOption?.severityLevels ?? [];
 
-  const content: Array<
-    | { type: "text"; text: string }
-    | { type: "image_url"; image_url: { url: string } }
-  > = [
+  const content: OpenAIContentPart[] = [
     {
       type: "text",
       text: buildImageValidationPrompt(cropType, allowedStages, allowedPestDiseases, allowedSeverityLevels),
@@ -316,7 +317,7 @@ export async function validateImagesWithGroq(
   for (let idx = 0; idx < base64Images.length; idx++) {
     const base64Data = base64Images[idx];
     console.log(
-      `[AI Plan Validation Groq Payload] Image ${idx} size: ${((base64Data.length * 0.75) / 1024).toFixed(2)} KB`
+      `[AI Plan Validation Payload] Image ${idx} size: ${((base64Data.length * 0.75) / 1024).toFixed(2)} KB`
     );
     content.push({
       type: "image_url",
@@ -324,22 +325,26 @@ export async function validateImagesWithGroq(
     });
   }
 
-  console.log("[AI Plan Validation API Call] Sending request to Groq API...");
-  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+  const model =
+    process.env.OPENROUTER_VISION_MODEL ||
+    "meta-llama/llama-3.2-11b-vision-instruct:free";
+  console.log(
+    `[AI Plan Validation API Call] Sending request to OpenRouter (${model})...`
+  );
+
+  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.GROQ_API_KEY_PLAN_VALIDATION}`,
+      Authorization: `Bearer ${apiKey}`,
+      "HTTP-Referer": process.env.NEXT_PUBLIC_BASE_URL || "https://vfc.vn",
+      "X-Title": "VFC Farmer Portal",
     },
     body: JSON.stringify({
-      model:
-        process.env.GROQ_VISION_MODEL ||
-        "meta-llama/llama-4-scout-17b-16e-instruct",
+      model,
       messages: [{ role: "user", content }],
       temperature: 0.1,
-      max_completion_tokens: 512,
-      response_format: { type: "json_object" },
-      stream: false,
+      max_tokens: 512,
     }),
   });
 
@@ -347,17 +352,17 @@ export async function validateImagesWithGroq(
   const data = JSON.parse(responseText || "{}");
   if (!res.ok) {
     throw new Error(
-      `Groq plan validation API failed with ${res.status}: ${JSON.stringify(data)}`
+      `OpenRouter plan validation API failed with ${res.status}: ${JSON.stringify(data)}`
     );
   }
 
   const text = data?.choices?.[0]?.message?.content;
   if (typeof text !== "string" || text.length === 0) {
-    throw new Error("Groq plan validation API returned an empty response");
+    throw new Error("OpenRouter plan validation API returned an empty response");
   }
 
   console.log(
-    `[AI Plan Validation Groq Response] Received response. Text length: ${text.length}\nRaw text:`, text
+    `[AI Plan Validation Response] Text length: ${text.length}\nRaw text:`, text
   );
   return parseImageValidationJson(text, cropType, allowedStages, allowedPestDiseases, allowedSeverityLevels);
 }
@@ -386,7 +391,7 @@ async function analyzeWithGemini(
   const { GoogleGenerativeAI } = await import("@google/generative-ai");
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
   const model = genAI.getGenerativeModel({
-    model: process.env.GEMINI_MODEL || "gemini-flash-latest",
+    model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
     generationConfig: { temperature: 0.1 },
   });
 
@@ -414,73 +419,6 @@ async function analyzeWithGemini(
   return parseAiJson(text, "gemini");
 }
 
-async function analyzeWithGroq(
-  prompt: string,
-  userImages: string[],
-  referenceData: ReferenceData[]
-): Promise<AiDiagnosisResponse> {
-  const hasApiKey = !!process.env.GROQ_API_KEY;
-  console.log(`[AI Diagnosis Groq API Key Check] Key exists: ${hasApiKey}`);
-  if (!hasApiKey) {
-    throw new Error("GROQ_API_KEY is not defined in environment variables");
-  }
-
-  const content: GroqContentPart[] = [
-    { type: "text", text: "Ảnh cây trồng của nông dân:" },
-  ];
-  for (const b64 of userImages) {
-    content.push({
-      type: "image_url",
-      image_url: { url: `data:image/jpeg;base64,${b64}` },
-    });
-  }
-  content.push({ type: "text", text: "\n\nDữ liệu bệnh tham khảo của VFC:" });
-  for (const ref of referenceData) {
-    content.push({ type: "text", text: "\n" + ref.text });
-    if (ref.base64Image) {
-      content.push({
-        type: "image_url",
-        image_url: { url: `data:image/jpeg;base64,${ref.base64Image}` },
-      });
-    }
-  }
-  content.push({ type: "text", text: `\n\n${prompt}` });
-
-  console.log("[AI Diagnosis API Call] Sending request to Groq API...");
-  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model:
-        process.env.GROQ_VISION_MODEL ||
-        "meta-llama/llama-4-scout-17b-16e-instruct",
-      messages: [{ role: "user", content }],
-      temperature: 0.2,
-      max_completion_tokens: 1024,
-      response_format: { type: "json_object" },
-      stream: false,
-    }),
-  });
-
-  const responseText = await res.text();
-  const data = JSON.parse(responseText || "{}");
-  if (!res.ok)
-    throw new Error(
-      `Groq API failed with ${res.status}: ${JSON.stringify(data)}`
-    );
-
-  const text = data?.choices?.[0]?.message?.content;
-  if (!text) throw new Error("Groq API returned an empty response");
-
-  console.log(
-    `[AI Diagnosis Groq Response] Received response. Text length: ${text.length}\nRaw text:`, text
-  );
-  return parseAiJson(text, "groq");
-}
-
 async function analyzeWithOpenRouter(
   prompt: string,
   userImages: string[],
@@ -492,7 +430,7 @@ async function analyzeWithOpenRouter(
     throw new Error("OPENROUTER_API_KEY is not defined in environment variables");
   }
 
-  const content: GroqContentPart[] = [
+  const content: OpenAIContentPart[] = [
     { type: "text", text: "Ảnh cây trồng của nông dân:" },
   ];
   for (const b64 of userImages) {
@@ -529,7 +467,6 @@ async function analyzeWithOpenRouter(
       messages: [{ role: "user", content }],
       temperature: 0.2,
       max_tokens: 1024,
-      response_format: { type: "json_object" },
     }),
   });
 
@@ -562,24 +499,14 @@ async function analyzeWithFallback(
     console.log(`[AI Fallback] Gemini succeeded | Provider: gemini | Disease: ${parsed.disease} | Products: ${parsed.solutionSets?.length ?? 0} sets`);
     return { ...parsed, aiProvider: "gemini" };
   } catch (geminiError) {
-    console.error("[AI Fallback] Gemini failed, trying Groq", geminiError);
+    console.error("[AI Fallback] Gemini failed, trying OpenRouter", geminiError);
   }
 
-  // 2nd: Groq
-  try {
-    console.log("[AI Fallback] Trying Groq...");
-    const parsed = await analyzeWithGroq(prompt, userImages, referenceData);
-    console.log(`[AI Fallback] Groq succeeded | Provider: groq | Disease: ${parsed.disease} | Products: ${parsed.solutionSets?.length ?? 0} sets`);
-    return { ...parsed, aiProvider: "groq", fallbackFrom: "gemini" };
-  } catch (groqError) {
-    console.error("[AI Fallback] Groq failed, trying OpenRouter", groqError);
-  }
-
-  // 3rd: OpenRouter
+  // 2nd: OpenRouter
   console.log("[AI Fallback] Trying OpenRouter...");
   const parsed = await analyzeWithOpenRouter(prompt, userImages, referenceData);
   console.log(`[AI Fallback] OpenRouter succeeded | Provider: openrouter | Disease: ${parsed.disease} | Products: ${parsed.solutionSets?.length ?? 0} sets`);
-  return { ...parsed, aiProvider: "openrouter", fallbackFrom: "groq" };
+  return { ...parsed, aiProvider: "openrouter", fallbackFrom: "gemini" };
 }
 
 export async function runAiDiagnosis(
