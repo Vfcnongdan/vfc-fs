@@ -31,8 +31,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { href: "/admin/crop-change-requests", icon: "🌱", label: "Duyệt cây trồng", show: isMdo },
     { href: "/admin/orders", icon: "🛒", label: "Quản lý đơn hàng", show: canSeeOrders },
     { href: "/admin/products", icon: "📦", label: "Sản phẩm", show: isAdminOnly },
-    { href: "/admin/system/users", icon: "👤", label: "Người dùng", show: isAdminOnly },
-    { href: "/admin/ai-training", icon: "🤖", label: "AI Training", show: isAdminOnly },
+    { href: "/admin/settings", icon: "⚙️", label: "Cài đặt", show: isAdminOnly },
   ].filter(item => item.show);
 
   const sidebarContent = (

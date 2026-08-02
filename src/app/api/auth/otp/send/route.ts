@@ -4,13 +4,15 @@ import { createOtpRecord } from "@/lib/otp";
 import { isPhoneAuthorizedForOtp } from "@/lib/otpAuth";
 import { getPhoneVariants, isValidVietnamesePhone } from "@/lib/phone";
 import { OtpController } from "@/controllers/OtpController";
-import { TelegramOtpService } from "@/services/otp/TelegramOtpService";
+import { OtpServiceFactory } from "@/services/otp/OtpServiceFactory";
+
 const schema = z.object({
   phone: z
     .string()
     .min(1)
     .refine(isValidVietnamesePhone, "Số điện thoại không hợp lệ"),
-  chatId: z.string().optional(), // Thêm chatId cho Telegram
+  chatId: z.string().optional(),
+  provider: z.enum(["telegram", "zalo", "all"]).optional(), // Hỗ trợ chỉ định "telegram", "zalo" hoặc "all" (gửi cả 2)
 });
 
 export async function POST(request: NextRequest) {
@@ -24,16 +26,18 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { phone, chatId } = parsed.data;
- 
+  const { phone, chatId, provider: requestedProvider } = parsed.data;
+
   try {
     const phoneVariants = getPhoneVariants(phone);
-
     const authorized = await isPhoneAuthorizedForOtp(phoneVariants);
 
     if (!authorized) {
       return Response.json(
-        { error: "PHONE_NOT_AUTHORIZED", message: "Số điện thoại không được phép truy cập hệ thống" },
+        {
+          error: "PHONE_NOT_AUTHORIZED",
+          message: "Số điện thoại không được phép truy cập hệ thống",
+        },
         { status: 403 }
       );
     }
@@ -51,29 +55,40 @@ export async function POST(request: NextRequest) {
     }
 
     const otp = await createOtpRecord(phone);
-    
-    // Khởi tạo service dựa trên cấu hình ENV
-    let otpService;
-    const provider = process.env.OTP_SERVICE_PROVIDER || 'telegram';
-    let target = chatId || phone;
 
-    if (provider === 'zalo') {
-      const { ZaloOtpService } = await import("@/services/otp/ZaloOtpService");
-      otpService = new ZaloOtpService(process.env.ZALO_OA_TOKEN!);
-    } else {
-      otpService = new TelegramOtpService(process.env.TELEGRAM_BOT_TOKEN!);
-      // Nếu có cố định Chat ID trong ENV thì dùng luôn, không quan trọng input
-      if (process.env.TELEGRAM_CHAT_ID) {
-        target = process.env.TELEGRAM_CHAT_ID;
-      }
-    }
+    // Xác định kênh gửi OTP. Mặc định là "all" (gửi đồng thời cả Zalo lẫn Telegram)
+    const activeProvider =
+      requestedProvider || process.env.OTP_SERVICE_PROVIDER || "all";
 
+    const otpService = OtpServiceFactory.create(activeProvider, {
+      phone,
+      chatId,
+    });
     const otpController = new OtpController(otpService);
 
-    // Gửi OTP
-    await otpController.send(target, otp, phone);
-    
-    return Response.json({ success: true, message: "OTP đã được gửi" });
+    let target = chatId || phone;
+    if (activeProvider === "telegram" && process.env.TELEGRAM_CHAT_ID) {
+      target = process.env.TELEGRAM_CHAT_ID;
+    }
+
+    // Gửi OTP qua service đã chọn (nếu activeProvider === 'all', sẽ gửi song song cả 2 kênh)
+    const sentSuccess = await otpController.send(target, otp, phone);
+
+    if (!sentSuccess) {
+      return Response.json(
+        { error: "OTP_SEND_FAILED", message: "Gửi OTP thất bại" },
+        { status: 500 }
+      );
+    }
+
+    return Response.json({
+      success: true,
+      message:
+        activeProvider === "all"
+          ? "Mã OTP đã được gửi đồng thời qua Zalo và Telegram"
+          : `Mã OTP đã được gửi qua ${activeProvider}`,
+      channel: activeProvider,
+    });
   } catch (err) {
     console.error("[OTP Send Error]", err);
     return Response.json({ error: "INTERNAL_ERROR" }, { status: 500 });

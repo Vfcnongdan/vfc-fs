@@ -470,3 +470,16 @@ model Farmer {
   @@index([phone])
   @@map("farmers")
 }
+
+model ZaloAuthToken {
+  id           String   @id @default("default")
+  accessToken  String   @map("access_token")
+  refreshToken String   @map("refresh_token")
+  expiresAt    DateTime @map("expires_at")
+  enabled      Boolean  @default(true) @map("enabled")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("zalo_auth_tokens")
+}
+
