@@ -111,8 +111,10 @@ export class ZaloTokenManager {
 
   /**
    * Đổi Authorization Code lấy Access Token & Refresh Token mới, lưu vào Database
+   * @param code - authorization_code từ Zalo OAuth
+   * @param codeVerifier - PKCE code_verifier (tùy chọn, Zalo v4 API khuyến nghị dùng PKCE)
    */
-  async exchangeAuthorizationCode(code: string): Promise<{
+  async exchangeAuthorizationCode(code: string, codeVerifier?: string): Promise<{
     success: boolean;
     message?: string;
     error?: string;
@@ -133,6 +135,9 @@ export class ZaloTokenManager {
       params.append("code", code);
       params.append("app_id", appId);
       params.append("grant_type", "authorization_code");
+      if (codeVerifier) {
+        params.append("code_verifier", codeVerifier);
+      }
 
       const response = await fetch("https://oauth.zaloapp.com/v4/oa/access_token", {
         method: "POST",

@@ -18,6 +18,7 @@ export default function AdminSettingsPage() {
   const [authCode, setAuthCode] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [toggling, setToggling] = useState(false);
+  const [pkceLoading, setPkceLoading] = useState(false);
 
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -94,6 +95,25 @@ export default function AdminSettingsPage() {
       setMessage({ type: "error", text: "Lỗi kết nối khi cập nhật trạng thái Zalo" });
     } finally {
       setToggling(false);
+    }
+  };
+
+  const handlePkceConnect = async () => {
+    try {
+      setPkceLoading(true);
+      setMessage(null);
+      const res = await fetch("/api/admin/settings/zalo/pkce");
+      const data = await res.json();
+
+      if (res.ok && data.success && data.authorizationUrl) {
+        window.location.href = data.authorizationUrl;
+      } else {
+        setMessage({ type: "error", text: data.error || "Không thể khởi tạo PKCE flow" });
+      }
+    } catch (err) {
+      setMessage({ type: "error", text: "Lỗi kết nối khi khởi tạo PKCE" });
+    } finally {
+      setPkceLoading(false);
     }
   };
 
@@ -242,7 +262,41 @@ export default function AdminSettingsPage() {
               </div>
             )}
 
-            {/* Activation Form */}
+            {/* PKCE Connect Button */}
+            {!status?.configured && (
+              <div className="bg-neutral-50/70 p-6 rounded-2xl border border-neutral-200 space-y-4">
+                <div>
+                  <h3 className="text-base font-bold text-neutral-900 flex items-center gap-2">
+                    <span>🔐</span>
+                    <span>Kết nối Zalo bằng PKCE (Khuyến nghị)</span>
+                  </h3>
+                  <p className="text-xs text-neutral-500 mt-1">
+                    Sử dụng OAuth 2.0 Authorization Code flow với PKCE để tự động lấy authorization code và kích hoạt chứng thực Zalo. An toàn hơn so với nhập code thủ công.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={pkceLoading}
+                  onClick={handlePkceConnect}
+                  className="flex items-center gap-2 px-6 py-3 bg-[#064E3B] text-white text-sm font-bold rounded-xl hover:bg-[#064E3B]/90 focus:ring-4 focus:ring-[#064E3B]/20 transition-all disabled:opacity-50 shadow-sm"
+                >
+                  {pkceLoading ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Đang kết nối...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>🔗</span>
+                      <span>Kết nối với Zalo OAuth</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+
+            {/* Activation Form (Manual Code Entry) */}
             <div className="bg-neutral-50/70 p-6 rounded-2xl border border-neutral-200 space-y-4">
               <div>
                 <h3 className="text-base font-bold text-neutral-900 flex items-center gap-2">
