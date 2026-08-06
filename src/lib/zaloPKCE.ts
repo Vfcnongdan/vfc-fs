@@ -1,7 +1,14 @@
 import { randomBytes, createHash } from "crypto";
 
 export function generateCodeVerifier(): string {
-  return randomBytes(32).toString("base64url");
+  // Zalo requires exactly 43 alphanumeric characters (a-zA-Z0-9)
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  const bytes = randomBytes(43);
+  let result = "";
+  for (let i = 0; i < 43; i++) {
+    result += chars[bytes[i] % chars.length];
+  }
+  return result;
 }
 
 export async function generateCodeChallenge(codeVerifier: string): Promise<string> {

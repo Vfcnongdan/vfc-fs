@@ -139,6 +139,8 @@ export class ZaloTokenManager {
         params.append("code_verifier", codeVerifier);
       }
 
+      console.log(`[ZaloTokenManager] Exchange request - app_id: ${appId}, code length: ${code.length}, code_verifier: ${codeVerifier ? `present (${codeVerifier.length} chars)` : "MISSING"}`);
+
       const response = await fetch("https://oauth.zaloapp.com/v4/oa/access_token", {
         method: "POST",
         headers: {
