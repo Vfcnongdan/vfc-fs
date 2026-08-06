@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyToken, COOKIE_NAME, Role } from "@/lib/auth";
 
 // Route protection config
-const PUBLIC_PATHS = ["/", "/assets", "/api/auth/otp/send", "/api/auth/otp/verify"];
+const PUBLIC_PATHS = ["/", "/assets", "/api/auth/otp/send", "/api/auth/otp/verify", "/zalo_verifierOyIX99Bk6tXmqSnrjELRVNV3wrIRjJ4FCpap.html"];
 const ROLE_PATHS: Record<string, Role[]> = {
   "/api/admin": [Role.ADMIN],
   "/admin/orders": [Role.ADMIN, Role.AGENCY, Role.SUPER_AGENT, Role.MDO, Role.SE],
