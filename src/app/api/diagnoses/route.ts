@@ -64,6 +64,33 @@ export async function POST(request: NextRequest) {
     );
 
     if (!validationResult.isValid) {
+      // WRONG_CROP: cây đúng nhưng sai loại → trả thông tin hữu ích, 200 OK (điểm cuối)
+      if (validationResult.reasonCode === "WRONG_CROP") {
+        const wrongCropSummary = validationResult.plantInfo
+          ? `Thông tin dịch hại trên cây trồng bạn đưa không chính xác. Đây là một số thông tin hữu ích về cây này:\n${validationResult.plantInfo}\n\nĐể được hỗ trợ hiệu quả từ VFC xin cung cấp thông tin và hình ảnh chính xác.`
+          : validationResult.userGuidance;
+
+        await prisma.plantDiagnosis.update({
+          where: { id: diagnosis.id },
+          data: {
+            rawAiResponse: validationResult as Prisma.JsonObject,
+            summary: wrongCropSummary,
+            status: DiagnosisStatus.DONE,
+          },
+        });
+        console.log(
+          `[POST AI Diagnosis] WRONG_CROP | ID: ${diagnosis.id} | plantInfo: ${validationResult.plantInfo?.slice(0, 100) ?? "null"}`
+        );
+        return apiOk({
+          id: diagnosis.id,
+          status: "DONE",
+          wrongCrop: true,
+          summary: wrongCropSummary,
+          plantInfo: validationResult.plantInfo,
+        });
+      }
+
+      // NOT_A_PLANT, BLURRY_IMAGE → trả 400 như cũ
       await prisma.plantDiagnosis.update({
         where: { id: diagnosis.id },
         data: {

@@ -42,6 +42,8 @@ type DiagnosisResult = {
   status: "PROCESSING" | "DONE" | "FAILED";
   summary?: string;
   confidence?: number;
+  wrongCrop?: boolean;
+  plantInfo?: string | null;
   rawAiResponse?: {
     disease?: string;
     severity?: string;
@@ -572,7 +574,11 @@ export default function DiagnosePage() {
       console.log("[Diagnose API Response]", data);
       if (!res.ok) throw new Error(data.error);
 
-      if (data.awaitingStage) {
+      if (data.wrongCrop) {
+        // WRONG_CROP — điểm cuối, hiển thị thông tin cây
+        setResult(data);
+        setLoading(false);
+      } else if (data.awaitingStage) {
         console.log("[Diagnose API] Awaiting stage, setting UI...");
         const detectedStage = data.detectedGrowthStage ?? null;
         setStageConfirmationDeclined(!detectedStage);
@@ -945,7 +951,90 @@ export default function DiagnosePage() {
                 </div>
               )}
 
-              {result.status === "DONE" && result.summary && (
+              {/* WRONG_CROP — thông tin hữu ích về cây thực tế */}
+              {result.status === "DONE" && result.wrongCrop && (
+                <div className="flex flex-col gap-4 animate-fade-in">
+                  {diagnosisImagePreview && (
+                    <div className="overflow-hidden rounded-2xl border border-amber-200 bg-amber-50/40 shadow-sm">
+                      <div className="border-b border-amber-200 px-4 py-2">
+                        <p className="text-xs font-bold uppercase tracking-wider text-amber-700">
+                          Ảnh đã gửi
+                        </p>
+                      </div>
+                      <div className="bg-white p-2">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={diagnosisImagePreview}
+                          alt="Ảnh cây trồng đã gửi"
+                          className="h-56 w-full rounded-xl object-cover sm:h-72"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50/80 to-orange-50/40 p-4 sm:p-5 shadow-sm">
+                    <div className="flex items-center gap-2.5 mb-4">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-lg">
+                        🔔
+                      </span>
+                      <div>
+                        <h3 className="text-base font-bold text-neutral-800">
+                          Loại cây không khớp
+                        </h3>
+                        <p className="text-xs text-neutral-500 mt-0.5">
+                          Hình ảnh gửi lên không phải loại cây bạn đã chọn
+                        </p>
+                      </div>
+                    </div>
+
+                    <p className="text-sm text-neutral-700 leading-relaxed mb-4">
+                      Thông tin dịch hại trên cây trồng bạn đưa không chính xác.
+                      Tuy nhiên, hệ thống đã nhận diện được cây trong ảnh và cung cấp một số thông tin tham khảo bên dưới.
+                    </p>
+
+                    {result.plantInfo && (
+                      <div className="rounded-xl border border-amber-200 bg-white/90 overflow-hidden mb-4">
+                        <div className="border-b border-amber-100 bg-amber-50/50 px-4 py-2.5">
+                          <p className="text-xs font-bold uppercase tracking-wider text-amber-700">
+                            📋 Thông tin tham khảo về cây
+                          </p>
+                        </div>
+                        <div className="flex flex-col gap-0 divide-y divide-neutral-100">
+                          {result.plantInfo
+                            .split("\n")
+                            .filter((line) => line.trim())
+                            .map((line, i) => (
+                              <div key={i} className="px-4 py-2.5">
+                                <p className="text-sm text-neutral-700 leading-relaxed">
+                                  {line.trim()}
+                                </p>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="rounded-xl border border-green-200 bg-green-50/60 px-4 py-3 mb-4">
+                      <p className="text-sm font-semibold text-green-800 leading-relaxed">
+                        💚 Để được hỗ trợ hiệu quả từ VFC, xin vui lòng cung cấp đúng loại cây trồng và hình ảnh rõ nét vùng bị bệnh.
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl border border-neutral-200 bg-neutral-50/80 px-4 py-3">
+                      <p className="text-[11px] text-neutral-500 leading-relaxed">
+                        <span className="font-bold text-neutral-600">⚠️ Lưu ý về độ chính xác:</span>{" "}
+                        Kết quả phân tích được tạo bởi trí tuệ nhân tạo (AI) và mang tính chất tham khảo.
+                        AI có thể nhận diện sai loại cây hoặc đưa ra thông tin chưa đầy đủ do hạn chế về chất lượng ảnh, góc chụp, hoặc dữ liệu huấn luyện.
+                        Thông tin trên không thay thế ý kiến chuyên gia — vui lòng liên hệ kỹ sư nông nghiệp VFC để được tư vấn chính xác nhất.
+                      </p>
+                    </div>
+                  </div>
+
+                  <ExpertContactBanner />
+                </div>
+              )}
+
+              {result.status === "DONE" && result.summary && !result.wrongCrop && (
                 <>
                   {diagnosisImagePreview && (
                     <div className="overflow-hidden rounded-2xl border border-green-100 bg-green-50/40 shadow-sm">

@@ -21,6 +21,8 @@ export type ImageValidationResponse = {
   detectedPestDisease: string | null;
   /** Mức độ bệnh phát hiện từ ảnh — khớp với cropGrowthStageOptions.severityLevels, null nếu không xác định */
   detectedSeverityLevel: string | null;
+  /** Thông tin chi tiết về cây thực tế khi reasonCode = WRONG_CROP, null cho các trường hợp khác */
+  plantInfo: string | null;
 };
 
 export type AiDiagnosisResponse = {
@@ -155,16 +157,17 @@ Hãy phân tích bức ảnh về mặt chi tiết vết bệnh và trả về m
   "userGuidance": "Chuỗi tiếng Việt hướng dẫn nông dân chụp lại nếu isValid là false, hoặc chuỗi trống nếu true",
   "detectedGrowthStage": "tên giai đoạn hoặc null",
   "detectedPestDisease": "loại dịch hại hoặc null",
-  "detectedSeverityLevel": "mức độ bệnh hoặc null"
+  "detectedSeverityLevel": "mức độ bệnh hoặc null",
+  "plantInfo": "Chuỗi tiếng Việt mô tả chi tiết về cây thực tế trong ảnh (khi WRONG_CROP), hoặc null"
 }
 ${stagesInfo}
 ${pestDiseasesInfo}
 ${severityInfo}
 
-Nếu ảnh không chứa cây trồng, bộ phận của cây (lá, thân, rễ): isValid = false, reasonCode = "NOT_A_PLANT", userGuidance = "Hệ thống không nhận diện được cây trồng trong ảnh. Vui lòng chụp rõ phần lá hoặc thân cây bị bệnh.", detectedGrowthStage = null
-Nếu ảnh là cây khác hoàn toàn so với target_crop: isValid = false, reasonCode = "WRONG_CROP", userGuidance = "Ảnh chụp có vẻ không phải là ${cropType || "cây trồng"}. Vui lòng kiểm tra lại loại cây bạn đã chọn.", detectedGrowthStage = null
-Nếu ảnh quá mờ, quá tối, quá sáng, chụp quá xa: isValid = false, reasonCode = "BLURRY_IMAGE", userGuidance = "Ảnh chụp không rõ chi tiết vết bệnh. Bạn vui lòng đưa camera lại gần vết bệnh trên cây (khoảng 20-30cm), giữ chắc tay và chụp lại rõ vết bệnh nhé.", detectedGrowthStage = null
-Nếu ảnh hợp lệ và phù hợp với target_crop: isValid = true, reasonCode = "VALID", userGuidance = ""`;
+Nếu ảnh không chứa cây trồng, bộ phận của cây (lá, thân, rễ): isValid = false, reasonCode = "NOT_A_PLANT", userGuidance = "Hệ thống không nhận diện được cây trồng trong ảnh. Vui lòng chụp rõ phần lá hoặc thân cây bị bệnh.", detectedGrowthStage = null, plantInfo = null
+Nếu ảnh là cây khác hoàn toàn so với target_crop: isValid = false, reasonCode = "WRONG_CROP", userGuidance = "Thông tin dịch hại trên cây trồng bạn đưa không chính xác.", detectedGrowthStage = null, plantInfo = "Viết bằng tiếng Việt với giọng văn chuyên nghiệp, trọng thị như một chuyên gia nông nghiệp tư vấn cho nông dân. Trình bày thành từng phần rõ ràng, mỗi phần trên một dòng riêng theo format sau:\n🌿 Tên cây: <tên cây thực tế nhận diện được, ghi cả tên khoa học nếu biết>\n🔍 Tình trạng hiện tại: <mô tả tình trạng sức khỏe của cây trong ảnh — khỏe mạnh, có dấu hiệu bệnh, thiếu dinh dưỡng, v.v.>\n💡 Công dụng: <công dụng phổ biến của loại cây này trong nông nghiệp, đời sống>\n🌍 Môi trường thích hợp: <khí hậu, đất đai, điều kiện ánh sáng phù hợp>\n🌱 Gợi ý canh tác: <phương pháp trồng, chăm sóc, phòng bệnh cơ bản nếu biết>\nNếu không chắc chắn phần nào thì bỏ qua phần đó, không bịa thông tin."
+Nếu ảnh quá mờ, quá tối, quá sáng, chụp quá xa: isValid = false, reasonCode = "BLURRY_IMAGE", userGuidance = "Ảnh chụp không rõ chi tiết vết bệnh. Bạn vui lòng đưa camera lại gần vết bệnh trên cây (khoảng 20-30cm), giữ chắc tay và chụp lại rõ vết bệnh nhé.", detectedGrowthStage = null, plantInfo = null
+Nếu ảnh hợp lệ và phù hợp với target_crop: isValid = true, reasonCode = "VALID", userGuidance = "", plantInfo = null`;
 }
 
 function parseImageValidationJson(
@@ -263,6 +266,7 @@ function parseImageValidationJson(
       detectedGrowthStage,
       detectedPestDisease,
       detectedSeverityLevel,
+      plantInfo: null,
     };
   }
 
@@ -276,6 +280,12 @@ function parseImageValidationJson(
         ? INVALID_IMAGE_GUIDANCE.NOT_A_PLANT
         : INVALID_IMAGE_GUIDANCE.BLURRY_IMAGE;
 
+  // Extract plantInfo for WRONG_CROP — AI trả mô tả chi tiết cây thực tế
+  const plantInfo =
+    parsed.reasonCode === "WRONG_CROP" && typeof parsed.plantInfo === "string"
+      ? parsed.plantInfo.trim() || null
+      : null;
+
   return {
     isValid: false,
     reasonCode: parsed.reasonCode,
@@ -283,6 +293,7 @@ function parseImageValidationJson(
     detectedGrowthStage: null,
     detectedPestDisease: null,
     detectedSeverityLevel: null,
+    plantInfo,
   };
 }
 
