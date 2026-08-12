@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getRequestUser, apiError, apiOk } from "@/lib/request";
 
@@ -43,21 +43,32 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { name, sku, slug, unit, stock, isActive, detail, categoryId } = body;
+    const { name, sku, slug, price, unit, stock, isActive, detail, categoryId, imageUrls } = body;
+
+    const cleanDetail = detail ? {
+      name: name || "",
+      plantCrops: detail.plantCrops || null,
+      type: detail.type || null,
+      ingredients: detail.ingredients || null,
+      targetDiseases: detail.targetDiseases || null,
+      usageInstruction: detail.usageInstruction || null,
+      description: detail.description || null,
+    } : undefined;
 
     const product = await prisma.product.create({
       data: {
         name,
         sku,
-        slug,
-        price: 0,
-        unit,
+        slug: slug || name.toLowerCase().trim().replace(/ /g, "-"),
+        price: price ? Number(price) : 0,
+        unit: unit || "chai",
         stock: stock || 0,
         isActive: isActive !== undefined ? isActive : true,
-        categoryId,
-        detail: detail ? { create: { name, ...detail } } : undefined,
+        categoryId: categoryId || null,
+        imageUrls: imageUrls || [],
+        detail: cleanDetail ? { create: cleanDetail } : undefined,
       },
-      include: { detail: true },
+      include: { detail: true, category: true },
     });
 
     return apiOk(product);

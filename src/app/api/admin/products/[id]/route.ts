@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getRequestUser, apiError, apiOk } from "@/lib/request";
 
@@ -12,7 +12,7 @@ export async function GET(
 
   const product = await prisma.product.findUnique({
     where: { id },
-    include: { detail: true },
+    include: { detail: true, category: true },
   });
 
   if (!product) return apiError("NOT_FOUND", 404);
@@ -29,7 +29,17 @@ export async function PUT(
 
   try {
     const body = await request.json();
-    const { name, sku, slug, unit, stock, isActive, detail, categoryId } = body;
+    const { name, sku, slug, price, unit, stock, isActive, detail, categoryId, imageUrls } = body;
+
+    const cleanDetail = detail ? {
+      name: name || "",
+      plantCrops: detail.plantCrops || null,
+      type: detail.type || null,
+      ingredients: detail.ingredients || null,
+      targetDiseases: detail.targetDiseases || null,
+      usageInstruction: detail.usageInstruction || null,
+      description: detail.description || null,
+    } : undefined;
 
     const product = await prisma.product.update({
       where: { id },
@@ -37,19 +47,20 @@ export async function PUT(
         name,
         sku,
         slug,
-        price: 0,
+        price: price !== undefined ? Number(price) : undefined,
         unit,
         stock,
         isActive,
-        categoryId,
-        detail: detail ? {
+        categoryId: categoryId !== undefined ? categoryId : undefined,
+        imageUrls: imageUrls !== undefined ? imageUrls : undefined,
+        detail: cleanDetail ? {
           upsert: {
-            create: { name: name || "", ...detail },
-            update: { name: name || "", ...detail },
+            create: cleanDetail,
+            update: cleanDetail,
           },
         } : undefined,
       },
-      include: { detail: true },
+      include: { detail: true, category: true },
     });
 
     return apiOk(product);

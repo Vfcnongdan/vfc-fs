@@ -114,13 +114,16 @@ export default function ProductsPage() {
                 className="group flex flex-col overflow-hidden rounded-2xl border border-neutral-100 bg-white shadow-sm transition hover:shadow-md"
               >
                 {/* Image */}
-                <div className="relative aspect-square w-full bg-neutral-50">
+                <Link
+                  href={`/farmer/products/${p.id}`}
+                  className="relative aspect-square w-full bg-neutral-50 block group-hover:opacity-95 transition"
+                >
                   {p.imageUrls[0] ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={p.imageUrls[0]}
                       alt={p.name}
-                      className="h-full w-full object-contain p-3"
+                      className="h-full w-full object-contain p-3 group-hover:scale-105 transition duration-200"
                     />
                   ) : (
                     <div className="flex h-full items-center justify-center text-4xl">🧪</div>
@@ -130,13 +133,16 @@ export default function ProductsPage() {
                       {p.category.name}
                     </span>
                   )}
-                </div>
+                </Link>
 
                 {/* Info + action */}
                 <div className="flex flex-1 flex-col gap-2 p-3">
-                  <p className="line-clamp-2 text-xs font-bold leading-tight text-neutral-800">
+                  <Link
+                    href={`/farmer/products/${p.id}`}
+                    className="line-clamp-2 text-xs font-bold leading-tight text-neutral-800 hover:text-emerald-700 transition"
+                  >
                     {p.name}
-                  </p>
+                  </Link>
                   {p.detail?.targetDiseases && (
                     <p className="line-clamp-1 text-[10px] text-neutral-400">
                       {p.detail.targetDiseases}
