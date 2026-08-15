@@ -3,10 +3,12 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useState, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { LogoutButton } from "@/components/LogoutButton";
 import { NotificationBell } from "@/components/NotificationBell";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [user, setUser] = useState<{ role: string } | null>(null);
 
@@ -33,6 +35,49 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { href: "/admin/settings", icon: "⚙️", label: "Cài đặt", show: isAdminOnly },
   ].filter(item => item.show);
 
+  const adminMiniApps = [
+    { href: "/admin/system/users", icon: "👤", label: "Quản lý người dùng", match: ["/admin/system"] },
+    { href: "/admin/ai-training", icon: "🧠", label: "AI Training", match: ["/admin/ai-training"] },
+    { href: "/admin/products", icon: "📦", label: "Sản phẩm", match: ["/admin/products"] },
+    { href: "/admin/members", icon: "👥", label: "Thành viên", match: ["/admin/members"] },
+  ];
+
+  const agentMiniApps = [
+    { href: "/agent/inventory", icon: "📦", label: "Quản lý hàng hóa", match: ["/agent/inventory"] },
+  ];
+
+  const miniApps = user?.role === "ADMIN" 
+    ? adminMiniApps 
+    : (user?.role === "AGENCY" || user?.role === "SUPER_AGENT") 
+      ? agentMiniApps 
+      : [];
+
+  const cleanPathname = pathname?.replace(/\/$/, "") || "";
+
+  const isMiniAppActive = (app: { match: string[] }) => {
+    return app.match.some(
+      (prefix) => cleanPathname === prefix || cleanPathname.startsWith(`${prefix}/`)
+    );
+  };
+
+  const isInMiniApp = miniApps.some((app) => isMiniAppActive(app));
+
+  const isItemActive = (href: string) => {
+    const cleanHref = href.replace(/\/$/, "");
+
+    if (cleanHref === "/admin") {
+      const otherItemsActive = menuItems
+        .filter((item) => item.href !== "/admin")
+        .some((item) => {
+          const itemHref = item.href.replace(/\/$/, "");
+          return cleanPathname === itemHref || cleanPathname.startsWith(`${itemHref}/`);
+        });
+
+      return (cleanPathname === "/admin" || cleanPathname.startsWith("/admin/")) && !otherItemsActive;
+    }
+    return cleanPathname === cleanHref || cleanPathname.startsWith(`${cleanHref}/`);
+  };
+
   const sidebarContent = (
     <aside className={`flex h-full flex-col bg-[#064E3B] shadow-2xl transition-all duration-300 ${isSidebarOpen ? "w-64" : "w-0 sm:w-64 overflow-hidden"}`}>
       <div className="flex items-center gap-2 px-6 py-8 min-w-[256px]">
@@ -47,17 +92,24 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       <nav className="flex flex-col gap-1.5 px-4 text-sm min-w-[256px]">
         <p className="px-3 mb-2 text-[10px] font-bold text-white/40 uppercase tracking-widest">Main Menu</p>
-        {menuItems.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            onClick={() => setIsSidebarOpen(false)}
-            className="flex items-center gap-3 rounded-xl px-4 py-3 text-white/70 hover:bg-white/10 hover:text-white transition-all font-medium border border-transparent hover:border-white/5"
-          >
-            <span className="text-base">{item.icon}</span>
-            <span className="tracking-tight">{item.label}</span>
-          </Link>
-        ))}
+        {menuItems.map((item) => {
+          const isActive = isItemActive(item.href);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={() => setIsSidebarOpen(false)}
+              className={`flex items-center gap-3 rounded-xl px-4 py-3 transition-all ${
+                isActive
+                  ? "bg-white/20 text-white font-bold border border-white/25 shadow-sm"
+                  : "text-white/70 hover:bg-white/10 hover:text-white font-medium border border-transparent hover:border-white/5"
+              }`}
+            >
+              <span className="text-base">{item.icon}</span>
+              <span className="tracking-tight">{item.label}</span>
+            </Link>
+          );
+        })}
 
         <div className="mt-4 pt-4 border-t border-white/10">
           <Link
@@ -104,19 +156,80 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       <div className="flex flex-1 flex-col">
         {/* Mobile Header */}
-        <header className="flex items-center justify-between bg-[#064E3B] px-4 py-2 sm:hidden shadow-md">
-          <button 
-            onClick={() => setIsSidebarOpen(true)}
-            className="text-white p-2 hover:bg-white/10 rounded-lg"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
-          </button>
-          <Image src="/assets/images/logo.svg" alt="VFC Logo" width={60} height={30} className="h-6 w-auto" />
-          <NotificationBell dark />
+        <header className="flex items-center justify-between bg-[#064E3B] px-3 py-2 sm:hidden shadow-md gap-2">
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <button 
+              onClick={() => setIsSidebarOpen(true)}
+              className="text-white p-1.5 hover:bg-white/10 rounded-lg"
+              aria-label="Open sidebar"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+            </button>
+            {!isInMiniApp && (
+              <Image src="/assets/images/logo.svg" alt="VFC Logo" width={60} height={30} className="h-6 w-auto" />
+            )}
+          </div>
+
+          {isInMiniApp && (
+            <div className="flex items-center gap-1 overflow-x-auto py-0.5 flex-1 min-w-0">
+              <div className="flex items-center gap-1 p-0.5 bg-black/20 rounded-xl border border-white/10">
+                {miniApps.map((app) => {
+                  const isActive = isMiniAppActive(app);
+                  return (
+                    <Link
+                      key={app.href}
+                      href={app.href}
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] whitespace-nowrap transition-all ${
+                        isActive
+                          ? "bg-white/20 text-white font-bold border border-white/20 shadow-sm"
+                          : "text-white/70 hover:text-white hover:bg-white/10 font-medium"
+                      }`}
+                    >
+                      <span className="text-xs">{app.icon}</span>
+                      <span>{app.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <div className="flex-shrink-0">
+            <NotificationBell dark />
+          </div>
         </header>
 
-        <div className="hidden items-center justify-end border-b border-neutral-200 bg-white px-8 py-3 sm:flex">
-          <NotificationBell />
+        {/* Desktop Header */}
+        <div className="hidden items-center justify-between border-b border-neutral-200 bg-white px-6 py-2.5 sm:flex min-h-[57px]">
+          {/* Left: Compact Mini Apps when inside a mini app */}
+          <div className="flex items-center gap-2 overflow-x-auto">
+            {isInMiniApp && (
+              <div className="flex items-center gap-1 p-1 bg-neutral-100/80 rounded-2xl border border-neutral-200/70 shadow-inner">
+                {miniApps.map((app) => {
+                  const isActive = isMiniAppActive(app);
+                  return (
+                    <Link
+                      key={app.href}
+                      href={app.href}
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs transition-all ${
+                        isActive
+                          ? "bg-[#064E3B] text-white shadow-sm ring-1 ring-black/5 font-bold"
+                          : "text-neutral-600 hover:text-neutral-900 hover:bg-white/80 font-medium"
+                      }`}
+                    >
+                      <span className="text-sm">{app.icon}</span>
+                      <span className="tracking-tight">{app.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Right: Notification Bell */}
+          <div className="flex items-center gap-3">
+            <NotificationBell />
+          </div>
         </div>
 
         <main className="flex-1 p-4 sm:p-8">{children}</main>
