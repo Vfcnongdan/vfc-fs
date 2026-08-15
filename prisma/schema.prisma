@@ -40,6 +40,7 @@ model User {
   profile            UserProfile?
   cropChangeRequests CropChangeRequest[] @relation("CropChangeRequester")
   cropChangeReviews  CropChangeRequest[] @relation("CropChangeReviewer")
+  qrScanLogs         QrScanLog[]
 
   @@index([phone])
   @@index([zaloId])
@@ -174,6 +175,7 @@ model Product {
   inventories    Inventory[]
   b2bOrderItems  B2bOrderItem[]
   b2cOrderItems  B2cOrderItem[]
+  qrScanLogs     QrScanLog[]
 
   @@index([categoryId])
   @@index([isActive])
@@ -481,5 +483,23 @@ model ZaloAuthToken {
   updatedAt    DateTime @updatedAt @map("updated_at")
 
   @@map("zalo_auth_tokens")
+}
+
+model QrScanLog {
+  id            String   @id @default(cuid())
+  userId        String?  @map("user_id")
+  productId     String?  @map("product_id")
+  scanCount     Int      @default(1) @map("scan_count")
+  lastScannedAt DateTime @default(now()) @map("last_scanned_at")
+  scans         Json     @default("[]")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, productId])
+  @@index([productId])
+  @@map("qr_scan_logs")
 }
 

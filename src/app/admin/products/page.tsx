@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Edit, Trash2, Power, ChevronLeft, ChevronRight, X, FileText, Info } from "lucide-react";
+import { Plus, Edit, Trash2, Power, ChevronLeft, ChevronRight, X, FileText, Info, QrCode, Download } from "lucide-react";
+import QRCode from "qrcode";
 
 interface ProductDetail {
   id?: string;
@@ -140,6 +141,25 @@ export default function AdminProductsPage() {
     setIsModalOpen(true);
   }
 
+  async function downloadQr(productId: string, productName: string) {
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+      const qrUrl = `${baseUrl}/qr/${productId}`;
+      const dataUrl = await QRCode.toDataURL(qrUrl, {
+        width: 512,
+        margin: 2,
+        color: { dark: "#064E3B", light: "#FFFFFF" },
+      });
+      const link = document.createElement("a");
+      link.download = `QR_${productName.replace(/[^a-zA-Z0-9_\-]/g, "_")}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (err) {
+      console.error("QR generation failed", err);
+      alert("Không thể tạo QR code.");
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6">
       {/* Page Title & Add Button */}
@@ -223,6 +243,13 @@ export default function AdminProductsPage() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-2">
+                        <button
+                          onClick={() => downloadQr(p.id, p.name)}
+                          className="p-1.5 text-neutral-400 hover:text-emerald-600 transition"
+                          title="Tải QR Code"
+                        >
+                          <QrCode size={16} />
+                        </button>
                         <button
                           onClick={() => openEditModal(p)}
                           className="p-1.5 text-neutral-400 hover:text-blue-600 transition"

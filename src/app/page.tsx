@@ -1,14 +1,16 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useRef, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import PageLoadingOverlay from "@/components/PageLoadingOverlay";
 
 type Step = "phone" | "otp";
 
-export default function HomePage() {
+function LoginContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("from") || "/farmer";
   const [step, setStep] = useState<Step>("phone");
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState(["", "", "", ""]);
@@ -29,7 +31,7 @@ export default function HomePage() {
       try {
         const res = await fetch("/api/auth/me");
         if (res.ok) {
-          router.push("/farmer");
+          router.push(redirectTo);
           router.refresh();
           return;
         }
@@ -88,7 +90,7 @@ export default function HomePage() {
       console.log("Login success, role:", data.user?.role);
       
       router.refresh();
-      router.push("/farmer");
+      router.push(redirectTo);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Có lỗi xảy ra");
       setOtp(["", "", "", ""]);
@@ -309,5 +311,13 @@ export default function HomePage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function HomePage() {
+  return (
+    <Suspense fallback={<PageLoadingOverlay />}>
+      <LoginContent />
+    </Suspense>
   );
 }

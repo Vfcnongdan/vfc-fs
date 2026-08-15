@@ -15,10 +15,10 @@ export default function AdminSettingsPage() {
   const [activeTab, setActiveTab] = useState<"zalo" | "general">("zalo");
   const [status, setStatus] = useState<ZaloStatus | null>(null);
   const [loading, setLoading] = useState(true);
-  const [authCode, setAuthCode] = useState("");
+  const [accessTokenInput, setAccessTokenInput] = useState("");
+  const [refreshTokenInput, setRefreshTokenInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [toggling, setToggling] = useState(false);
-  const [pkceLoading, setPkceLoading] = useState(false);
 
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -43,10 +43,14 @@ export default function AdminSettingsPage() {
     fetchStatus();
   }, []);
 
-  const handleActivateZalo = async (e: React.FormEvent) => {
+  const handleSaveTokens = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!authCode.trim()) {
-      setMessage({ type: "error", text: "Vui lòng nhập Authorization Code" });
+    if (!accessTokenInput.trim()) {
+      setMessage({ type: "error", text: "Vui lòng nhập Access Token" });
+      return;
+    }
+    if (!refreshTokenInput.trim()) {
+      setMessage({ type: "error", text: "Vui lòng nhập Refresh Token" });
       return;
     }
 
@@ -54,21 +58,25 @@ export default function AdminSettingsPage() {
       setSubmitting(true);
       setMessage(null);
       const res = await fetch("/api/admin/settings/zalo", {
-        method: "POST",
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: authCode.trim() }),
+        body: JSON.stringify({
+          accessToken: accessTokenInput.trim(),
+          refreshToken: refreshTokenInput.trim(),
+        }),
       });
       const data = await res.json();
 
       if (res.ok && data.success) {
-        setMessage({ type: "success", text: data.message || "Kích hoạt chứng thực Zalo thành công!" });
-        setAuthCode("");
+        setMessage({ type: "success", text: data.message || "Lưu token thành công!" });
+        setAccessTokenInput("");
+        setRefreshTokenInput("");
         await fetchStatus();
       } else {
-        setMessage({ type: "error", text: data.error || data.message || "Kích hoạt thất bại" });
+        setMessage({ type: "error", text: data.error || data.message || "Lưu token thất bại" });
       }
     } catch (err) {
-      setMessage({ type: "error", text: "Lỗi kết nối tới máy chủ khi kích hoạt Zalo" });
+      setMessage({ type: "error", text: "Lỗi kết nối tới máy chủ khi lưu token" });
     } finally {
       setSubmitting(false);
     }
@@ -98,24 +106,6 @@ export default function AdminSettingsPage() {
     }
   };
 
-  const handlePkceConnect = async () => {
-    try {
-      setPkceLoading(true);
-      setMessage(null);
-      const res = await fetch("/api/admin/settings/zalo/pkce");
-      const data = await res.json();
-
-      if (res.ok && data.success && data.authorizationUrl) {
-        window.location.href = data.authorizationUrl;
-      } else {
-        setMessage({ type: "error", text: data.error || "Không thể khởi tạo PKCE flow" });
-      }
-    } catch (err) {
-      setMessage({ type: "error", text: "Lỗi kết nối khi khởi tạo PKCE" });
-    } finally {
-      setPkceLoading(false);
-    }
-  };
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 pb-12">
@@ -262,63 +252,43 @@ export default function AdminSettingsPage() {
               </div>
             )}
 
-            {/* PKCE Connect Button */}
-            {!status?.configured && (
-              <div className="bg-neutral-50/70 p-6 rounded-2xl border border-neutral-200 space-y-4">
-                <div>
-                  <h3 className="text-base font-bold text-neutral-900 flex items-center gap-2">
-                    <span>🔐</span>
-                    <span>Kết nối Zalo bằng PKCE (Khuyến nghị)</span>
-                  </h3>
-                  <p className="text-xs text-neutral-500 mt-1">
-                    Sử dụng OAuth 2.0 Authorization Code flow với PKCE để tự động lấy authorization code và kích hoạt chứng thực Zalo. An toàn hơn so với nhập code thủ công.
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  disabled={pkceLoading}
-                  onClick={handlePkceConnect}
-                  className="flex items-center gap-2 px-6 py-3 bg-[#064E3B] text-white text-sm font-bold rounded-xl hover:bg-[#064E3B]/90 focus:ring-4 focus:ring-[#064E3B]/20 transition-all disabled:opacity-50 shadow-sm"
-                >
-                  {pkceLoading ? (
-                    <>
-                      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      <span>Đang kết nối...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>🔗</span>
-                      <span>Kết nối với Zalo OAuth</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            )}
-
-            {/* Activation Form (Manual Code Entry) */}
+            {/* Direct Token Input Form */}
             <div className="bg-neutral-50/70 p-6 rounded-2xl border border-neutral-200 space-y-4">
               <div>
                 <h3 className="text-base font-bold text-neutral-900 flex items-center gap-2">
                   <span>🔑</span>
-                  <span>Kích hoạt / Cập nhật Chứng thực bằng Authorization Code</span>
+                  <span>Nhập Token trực tiếp</span>
                 </h3>
                 <p className="text-xs text-neutral-500 mt-1">
-                  Nhập <code className="bg-white px-1.5 py-0.5 rounded border border-neutral-200 font-bold text-neutral-800">authorization_code</code> lấy từ Zalo Developer Console hoặc liên kết đăng nhập OAuth Zalo để khởi tạo Access Token và Refresh Token mới.
+                  Nhập <code className="bg-white px-1.5 py-0.5 rounded border border-neutral-200 font-bold text-neutral-800">Access Token</code> và <code className="bg-white px-1.5 py-0.5 rounded border border-neutral-200 font-bold text-neutral-800">Refresh Token</code> lấy từ Zalo Developer Console để kích hoạt hoặc cập nhật chứng thực Zalo OA.
                 </p>
               </div>
 
-              <form onSubmit={handleActivateZalo} className="space-y-4">
+              <form onSubmit={handleSaveTokens} className="space-y-4">
                 <div>
-                  <label htmlFor="authCode" className="block text-xs font-bold text-neutral-700 mb-1.5">
-                    Authorization Code:
+                  <label htmlFor="accessToken" className="block text-xs font-bold text-neutral-700 mb-1.5">
+                    Access Token:
                   </label>
                   <input
-                    id="authCode"
+                    id="accessToken"
                     type="text"
-                    value={authCode}
-                    onChange={(e) => setAuthCode(e.target.value)}
-                    placeholder="Dán mã authorization_code tại đây..."
+                    value={accessTokenInput}
+                    onChange={(e) => setAccessTokenInput(e.target.value)}
+                    placeholder="Dán Access Token tại đây..."
+                    className="w-full px-4 py-3 bg-white border border-neutral-300 rounded-xl text-sm font-mono focus:ring-2 focus:ring-[#064E3B] focus:border-[#064E3B] outline-none transition"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="refreshToken" className="block text-xs font-bold text-neutral-700 mb-1.5">
+                    Refresh Token:
+                  </label>
+                  <input
+                    id="refreshToken"
+                    type="text"
+                    value={refreshTokenInput}
+                    onChange={(e) => setRefreshTokenInput(e.target.value)}
+                    placeholder="Dán Refresh Token tại đây..."
                     className="w-full px-4 py-3 bg-white border border-neutral-300 rounded-xl text-sm font-mono focus:ring-2 focus:ring-[#064E3B] focus:border-[#064E3B] outline-none transition"
                   />
                 </div>
@@ -332,12 +302,12 @@ export default function AdminSettingsPage() {
                     {submitting ? (
                       <>
                         <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        <span>Đang xử lý kích hoạt...</span>
+                        <span>Đang lưu token...</span>
                       </>
                     ) : (
                       <>
-                        <span>⚡</span>
-                        <span>Kích hoạt Chứng thực Zalo</span>
+                        <span>💾</span>
+                        <span>Lưu Token vào Database</span>
                       </>
                     )}
                   </button>
@@ -348,7 +318,7 @@ export default function AdminSettingsPage() {
                     rel="noreferrer"
                     className="text-xs font-bold text-[#064E3B] hover:underline"
                   >
-                    Lấy code tại Zalo Developer ↗
+                    Zalo Developer Console ↗
                   </a>
                 </div>
               </form>

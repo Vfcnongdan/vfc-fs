@@ -56,6 +56,51 @@ export async function POST(request: NextRequest) {
 }
 
 /**
+ * PUT /api/admin/settings/zalo
+ * Nhận Access Token và Refresh Token trực tiếp từ Admin UI, lưu vào Database
+ */
+export async function PUT(request: NextRequest) {
+  const user = await getRequestUser(request);
+  if (!user || !requireRole(user, Role.ADMIN)) {
+    return apiError("Unauthorized", 401);
+  }
+
+  try {
+    const body = await request.json();
+    const { accessToken, refreshToken } = body;
+
+    if (!accessToken || typeof accessToken !== "string" || !accessToken.trim()) {
+      return apiError("Vui lòng nhập Access Token hợp lệ", 400);
+    }
+    if (!refreshToken || typeof refreshToken !== "string" || !refreshToken.trim()) {
+      return apiError("Vui lòng nhập Refresh Token hợp lệ", 400);
+    }
+
+    // Mặc định hạn dùng 90.000 giây (~25 giờ) theo chuẩn Zalo
+    const expiresInSeconds = 90000;
+
+    await ZaloTokenManager.getInstance().saveTokens(
+      accessToken.trim(),
+      refreshToken.trim(),
+      expiresInSeconds,
+      true
+    );
+
+    return apiOk({
+      success: true,
+      message: "Đã lưu Access Token và Refresh Token vào Database thành công!",
+      data: {
+        expiresInSeconds,
+        accessTokenMasked: accessToken.trim().substring(0, 10) + "...",
+        refreshTokenMasked: refreshToken.trim().substring(0, 10) + "...",
+      },
+    });
+  } catch (error: any) {
+    return apiError(error?.message || "Lỗi khi lưu Zalo tokens", 500);
+  }
+}
+
+/**
  * PATCH /api/admin/settings/zalo
  * Bật hoặc Tắt trạng thái chứng thực Zalo
  */
