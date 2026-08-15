@@ -489,6 +489,8 @@ model QrScanLog {
   id            String   @id @default(cuid())
   userId        String?  @map("user_id")
   productId     String?  @map("product_id")
+  code          String   @default("")
+  success       Boolean  @default(true)
   scanCount     Int      @default(1) @map("scan_count")
   lastScannedAt DateTime @default(now()) @map("last_scanned_at")
   scans         Json     @default("[]")
@@ -498,8 +500,12 @@ model QrScanLog {
   user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
 
-  @@unique([userId, productId])
+  @@unique([userId, code])
   @@index([productId])
+  @@index([code])
+  @@index([userId])
+  @@index([lastScannedAt])
+  @@index([success])
   @@map("qr_scan_logs")
 }
 

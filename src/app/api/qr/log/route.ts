@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getRequestUser, apiOk, apiError } from "@/lib/request";
 
-// POST /api/qr/log — Backfill userId after login for anonymous QR scans
+// POST /api/qr/log — Ghi nhận và theo dõi lịch sử quét QR
 export async function POST(request: NextRequest) {
   const user = await getRequestUser(request);
   if (!user) return apiError("UNAUTHORIZED", 401);
@@ -11,76 +11,71 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { productId, code, success } = body;
 
+    if (!code || typeof code !== "string") {
+      return apiError("MISSING_CODE", 400);
+    }
+
+    const trimmedCode = code.trim();
+    const isSuccess = Boolean(success);
+
     const ip =
       request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
       request.headers.get("x-real-ip") ||
       "unknown";
 
-    if (success) {
-      if (!productId) return apiError("MISSING_PRODUCT_ID", 400);
+    const userAgent = request.headers.get("user-agent") || undefined;
 
-      const existing = await prisma.qrScanLog.findUnique({
-        where: { userId_productId: { userId: user.id, productId } },
-      });
+    // Tìm log đã tồn tại của cặp (userId, code)
+    const existing = await prisma.qrScanLog.findFirst({
+      where: {
+        userId: user.id,
+        code: trimmedCode,
+      },
+    });
 
-      if (existing) {
-        // Anti-spam: skip if last scan < 30 seconds ago
-        const timeDiff = Date.now() - new Date(existing.lastScannedAt).getTime();
-        if (timeDiff > 30_000) {
-          const scans = Array.isArray(existing.scans) ? existing.scans : [];
-          await prisma.qrScanLog.update({
-            where: { id: existing.id },
-            data: {
-              scanCount: existing.scanCount + 1,
-              lastScannedAt: new Date(),
-              scans: [...scans, { at: new Date().toISOString(), success: true, ip, code }],
-            },
-          });
-        }
-      } else {
-        await prisma.qrScanLog.create({
+    const now = new Date();
+    const scanEntry = {
+      at: now.toISOString(),
+      ip,
+      ...(userAgent ? { ua: userAgent } : {}),
+    };
+
+    if (existing) {
+      // Chống spam: nếu quét lại cùng 1 mã trong vòng 10 giây thì bỏ qua không ghi thêm
+      const timeDiff = now.getTime() - new Date(existing.lastScannedAt).getTime();
+      if (timeDiff > 10_000) {
+        const scans = Array.isArray(existing.scans) ? (existing.scans as any[]) : [];
+        // Giữ lại tối đa 500 lần quét gần nhất để tránh phình mảng JSON
+        const updatedScans = [...scans, scanEntry].slice(-500);
+
+        await prisma.qrScanLog.update({
+          where: { id: existing.id },
           data: {
-            userId: user.id,
-            productId,
-            scans: [{ at: new Date().toISOString(), success: true, ip, code }],
+            scanCount: existing.scanCount + 1,
+            lastScannedAt: now,
+            productId: productId || existing.productId,
+            success: isSuccess,
+            scans: updatedScans,
           },
         });
       }
     } else {
-      // Failed scan (invalid code)
-      if (!code) return apiError("MISSING_CODE", 400);
-      
-      const existing = await prisma.qrScanLog.findFirst({
-        where: { userId: user.id, productId: null },
+      await prisma.qrScanLog.create({
+        data: {
+          userId: user.id,
+          code: trimmedCode,
+          productId: productId || null,
+          success: isSuccess,
+          scanCount: 1,
+          lastScannedAt: now,
+          scans: [scanEntry],
+        },
       });
-
-      if (existing) {
-        const timeDiff = Date.now() - new Date(existing.lastScannedAt).getTime();
-        if (timeDiff > 5_000) { // 5s anti-spam for failed scans
-          const scans = Array.isArray(existing.scans) ? existing.scans : [];
-          await prisma.qrScanLog.update({
-            where: { id: existing.id },
-            data: {
-              scanCount: existing.scanCount + 1,
-              lastScannedAt: new Date(),
-              scans: [...scans, { at: new Date().toISOString(), success: false, code, ip }],
-            },
-          });
-        }
-      } else {
-        await prisma.qrScanLog.create({
-          data: {
-            userId: user.id,
-            productId: null,
-            scans: [{ at: new Date().toISOString(), success: false, code, ip }],
-          },
-        });
-      }
     }
 
     return apiOk({ status: "logged" });
   } catch (err) {
-    console.error("[QR Log]", err);
+    console.error("[QR Log Error]", err);
     return apiError("INTERNAL_ERROR", 500);
   }
 }
