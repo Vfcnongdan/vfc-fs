@@ -6,9 +6,12 @@ interface ZaloStatus {
   configured: boolean;
   enabled: boolean;
   expiresAt: string | null;
+  refreshTokenExpiresAt: string | null;
   accessTokenMasked?: string;
   refreshTokenMasked?: string;
   isExpiringSoon?: boolean;
+  refreshTokenAlertLevel?: "ok" | "warning" | "critical" | "expired" | "unknown";
+  refreshTokenDaysLeft?: number | null;
 }
 
 export default function AdminSettingsPage() {
@@ -19,6 +22,9 @@ export default function AdminSettingsPage() {
   const [refreshTokenInput, setRefreshTokenInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [toggling, setToggling] = useState(false);
+  const [testPhone, setTestPhone] = useState("");
+  const [testingOtp, setTestingOtp] = useState(false);
+  const [testOtpResult, setTestOtpResult] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -103,6 +109,33 @@ export default function AdminSettingsPage() {
       setMessage({ type: "error", text: "Lỗi kết nối khi cập nhật trạng thái Zalo" });
     } finally {
       setToggling(false);
+    }
+  };
+
+  const handleTestOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!testPhone.trim()) {
+      setTestOtpResult({ type: "error", text: "Vui lòng nhập số điện thoại" });
+      return;
+    }
+    try {
+      setTestingOtp(true);
+      setTestOtpResult(null);
+      const res = await fetch("/api/admin/settings/zalo/test-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: testPhone.trim() }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setTestOtpResult({ type: "success", text: data.message + (data.note ? ` ${data.note}` : "") });
+      } else {
+        setTestOtpResult({ type: "error", text: data.error || data.message || "Gửi OTP thất bại" });
+      }
+    } catch {
+      setTestOtpResult({ type: "error", text: "Lỗi kết nối khi gửi OTP test" });
+    } finally {
+      setTestingOtp(false);
     }
   };
 
@@ -227,28 +260,87 @@ export default function AdminSettingsPage() {
 
             {/* Current Token Status Dashboard */}
             {status?.configured && (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="p-4 bg-neutral-50 rounded-2xl border border-neutral-200">
-                  <span className="text-xs text-neutral-500 font-bold uppercase tracking-wider">Hạn dùng Token</span>
-                  <div className="mt-1 text-sm font-extrabold text-neutral-900">
-                    {status.expiresAt ? new Date(status.expiresAt).toLocaleString("vi-VN") : "N/A"}
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="p-4 bg-neutral-50 rounded-2xl border border-neutral-200">
+                    <span className="text-xs text-neutral-500 font-bold uppercase tracking-wider">Hạn dùng Token</span>
+                    <div className="mt-1 text-sm font-extrabold text-neutral-900">
+                      {status.expiresAt ? new Date(status.expiresAt).toLocaleString("vi-VN") : "N/A"}
+                    </div>
+                    {status.isExpiringSoon && (
+                      <span className="text-[11px] font-bold text-amber-600 mt-1 block">⚠️ Sắp hết hạn (sẽ tự động refresh)</span>
+                    )}
                   </div>
-                  {status.isExpiringSoon && (
-                    <span className="text-[11px] font-bold text-amber-600 mt-1 block">⚠️ Sắp hết hạn (sẽ tự động refresh)</span>
-                  )}
-                </div>
-                <div className="p-4 bg-neutral-50 rounded-2xl border border-neutral-200">
-                  <span className="text-xs text-neutral-500 font-bold uppercase tracking-wider">Access Token (DB)</span>
-                  <div className="mt-1 text-xs font-mono font-bold text-neutral-700 truncate">
-                    {status.accessTokenMasked || "Chưa có"}
+                  <div className="p-4 bg-neutral-50 rounded-2xl border border-neutral-200">
+                    <span className="text-xs text-neutral-500 font-bold uppercase tracking-wider">Access Token (DB)</span>
+                    <div className="mt-1 text-xs font-mono font-bold text-neutral-700 truncate">
+                      {status.accessTokenMasked || "Chưa có"}
+                    </div>
+                  </div>
+                  <div className="p-4 bg-neutral-50 rounded-2xl border border-neutral-200">
+                    <span className="text-xs text-neutral-500 font-bold uppercase tracking-wider">Refresh Token (DB)</span>
+                    <div className="mt-1 text-xs font-mono font-bold text-neutral-700 truncate">
+                      {status.refreshTokenMasked || "Chưa có"}
+                    </div>
                   </div>
                 </div>
-                <div className="p-4 bg-neutral-50 rounded-2xl border border-neutral-200">
-                  <span className="text-xs text-neutral-500 font-bold uppercase tracking-wider">Refresh Token (DB)</span>
-                  <div className="mt-1 text-xs font-mono font-bold text-neutral-700 truncate">
-                    {status.refreshTokenMasked || "Chưa có"}
-                  </div>
-                </div>
+
+                {/* Refresh Token Expiry Alert Panel */}
+                {(() => {
+                  const level = status.refreshTokenAlertLevel;
+                  const days = status.refreshTokenDaysLeft;
+                  if (!level || level === "ok") return null;
+                  const configs = {
+                    expired: {
+                      bg: "bg-red-50 border-red-300",
+                      icon: "⛔",
+                      title: "Refresh Token Zalo đã hết hạn!",
+                      body: "Hệ thống sẽ không thể tự động renew Access Token. Vui lòng nhập lại token mới ngay.",
+                      textColor: "text-red-900",
+                      subColor: "text-red-700",
+                    },
+                    critical: {
+                      bg: "bg-red-50 border-red-200",
+                      icon: "🔴",
+                      title: `Refresh Token sắp hết hạn trong ${days} ngày!`,
+                      body: "Hãy chuẩn bị cập nhật lại token sớm. Nếu cron job ngưng chạy, token có thể expire mà không ai biết.",
+                      textColor: "text-red-900",
+                      subColor: "text-red-700",
+                    },
+                    warning: {
+                      bg: "bg-amber-50 border-amber-200",
+                      icon: "🟡",
+                      title: `Refresh Token còn ${days} ngày`,
+                      body: "Hãy theo dõi. Nếu cron job chạy ổn định, token sẽ tự động renew trước khi hết hạn.",
+                      textColor: "text-amber-900",
+                      subColor: "text-amber-700",
+                    },
+                    unknown: {
+                      bg: "bg-neutral-50 border-neutral-200",
+                      icon: "❓",
+                      title: "Chưa xác định hạn Refresh Token",
+                      body: "Token này được lưu trước khi hệ thống tracking được cập nhật. Vui lòng nhập lại token để khởi động bộ đếm chính xác.",
+                      textColor: "text-neutral-900",
+                      subColor: "text-neutral-600",
+                    },
+                  };
+                  const cfg = configs[level as keyof typeof configs];
+                  if (!cfg) return null;
+                  return (
+                    <div className={`p-4 rounded-2xl border flex items-start gap-3 ${cfg.bg}`}>
+                      <span className="text-2xl mt-0.5">{cfg.icon}</span>
+                      <div>
+                        <p className={`text-sm font-extrabold ${cfg.textColor}`}>{cfg.title}</p>
+                        <p className={`text-xs mt-0.5 ${cfg.subColor}`}>{cfg.body}</p>
+                        {status.refreshTokenExpiresAt && (
+                          <p className={`text-[11px] mt-1 font-mono ${cfg.subColor} opacity-70`}>
+                            Hạn: {new Date(status.refreshTokenExpiresAt).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" })}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             )}
 
@@ -322,6 +414,62 @@ export default function AdminSettingsPage() {
                   </a>
                 </div>
               </form>
+            </div>
+
+            {/* Smoke Test OTP Section */}
+            <div className="bg-blue-50/60 p-6 rounded-2xl border border-blue-200 space-y-4">
+              <div>
+                <h3 className="text-base font-bold text-neutral-900 flex items-center gap-2">
+                  <span>🧪</span>
+                  <span>Kiểm tra kết nối Zalo (Smoke Test)</span>
+                </h3>
+                <p className="text-xs text-neutral-500 mt-1">
+                  Gửi một OTP test thực tế tới số điện thoại để xác nhận Zalo token đang hoạt động. OTP sẽ là{" "}
+                  <code className="bg-white px-1.5 py-0.5 rounded border border-neutral-200 font-bold text-neutral-800">123456</code>{" "}
+                  (không hợp lệ để đăng nhập, chỉ dùng để test).
+                </p>
+              </div>
+
+              <form onSubmit={handleTestOtp} className="flex flex-col sm:flex-row gap-3">
+                <input
+                  id="testPhone"
+                  type="tel"
+                  value={testPhone}
+                  onChange={(e) => setTestPhone(e.target.value)}
+                  placeholder="Nhập số điện thoại (09x, 08x, 03x...)"
+                  className="flex-1 px-4 py-3 bg-white border border-blue-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition"
+                />
+                <button
+                  type="submit"
+                  disabled={testingOtp}
+                  className="flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-blue-700 focus:ring-4 focus:ring-blue-200 transition-all disabled:opacity-50 shadow-sm whitespace-nowrap"
+                >
+                  {testingOtp ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Đang gửi...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>📤</span>
+                      <span>Gửi OTP Test</span>
+                    </>
+                  )}
+                </button>
+              </form>
+
+              {testOtpResult && (
+                <div
+                  className={`p-3 rounded-xl border flex items-start gap-2.5 text-sm ${
+                    testOtpResult.type === "success"
+                      ? "bg-emerald-50 border-emerald-200 text-emerald-900"
+                      : "bg-red-50 border-red-200 text-red-900"
+                  }`}
+                >
+                  <span className="text-base mt-0.5">{testOtpResult.type === "success" ? "✅" : "❌"}</span>
+                  <span className="font-semibold">{testOtpResult.text}</span>
+                </div>
+              )}
             </div>
           </div>
         </div>

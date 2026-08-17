@@ -76,14 +76,17 @@ export async function PUT(request: NextRequest) {
       return apiError("Vui lòng nhập Refresh Token hợp lệ", 400);
     }
 
-    // Mặc định hạn dùng 90.000 giây (~25 giờ) theo chuẩn Zalo
+    // Access Token mặc định 90.000 giây (~25 giờ) theo chuẩn Zalo
     const expiresInSeconds = 90000;
+    // Refresh Token Zalo có hạn 90 ngày
+    const refreshTokenExpiresInSeconds = 90 * 24 * 60 * 60;
 
     await ZaloTokenManager.getInstance().saveTokens(
       accessToken.trim(),
       refreshToken.trim(),
       expiresInSeconds,
-      true
+      true,
+      refreshTokenExpiresInSeconds
     );
 
     return apiOk({

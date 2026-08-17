@@ -11,6 +11,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [user, setUser] = useState<{ role: string } | null>(null);
+  const [zaloAlert, setZaloAlert] = useState<{
+    level: "ok" | "warning" | "critical" | "expired" | "unknown";
+    daysLeft: number | null;
+  } | null>(null);
 
   useEffect(() => {
     fetch("/api/auth/me")
@@ -23,6 +27,22 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       .then((data) => setUser(data.user))
       .catch(() => {});
   }, []);
+
+  // Lấy trạng thái Zalo token cho admin — chỉ fetch khi role là ADMIN
+  useEffect(() => {
+    if (user?.role !== "ADMIN") return;
+    fetch("/api/admin/settings/zalo")
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => {
+        if (data?.status) {
+          setZaloAlert({
+            level: data.status.refreshTokenAlertLevel ?? "unknown",
+            daysLeft: data.status.refreshTokenDaysLeft ?? null,
+          });
+        }
+      })
+      .catch(() => {});
+  }, [user]);
 
   const canSeeOrders = user?.role === "ADMIN" || user?.role === "AGENCY" || user?.role === "SUPER_AGENT" || user?.role === "MDO" || user?.role === "SE";
   const isAdminOnly = user?.role === "ADMIN";
@@ -194,7 +214,30 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </div>
           )}
 
-          <div className="flex-shrink-0">
+          <div className="flex-shrink-0 flex items-center gap-2">
+            {/* Zalo Token Alert Badge — chỉ ADMIN */}
+            {user?.role === "ADMIN" && zaloAlert && zaloAlert.level !== "ok" && (
+              <a
+                href="/admin/settings"
+                title="Xem cài đặt Zalo"
+                className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold border transition-all ${
+                  zaloAlert.level === "expired"
+                    ? "bg-red-600 text-white border-red-700 animate-pulse"
+                    : zaloAlert.level === "critical"
+                    ? "bg-red-50 text-red-700 border-red-300 animate-pulse"
+                    : "bg-amber-50 text-amber-700 border-amber-300"
+                }`}
+              >
+                <span>{zaloAlert.level === "expired" ? "⛔" : zaloAlert.level === "critical" ? "🔴" : "🟡"}</span>
+                <span className="hidden xs:inline">
+                  {zaloAlert.level === "expired"
+                    ? "Zalo hết hạn!"
+                    : zaloAlert.level === "unknown"
+                    ? "Zalo: chưa rõ hạn"
+                    : `Zalo ${zaloAlert.daysLeft}d`}
+                </span>
+              </a>
+            )}
             <NotificationBell dark />
           </div>
         </header>
@@ -226,8 +269,36 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             )}
           </div>
 
-          {/* Right: Notification Bell */}
+          {/* Right: Notification Bell + Zalo Badge */}
           <div className="flex items-center gap-3">
+            {/* Zalo Token Alert Badge — chỉ ADMIN */}
+            {user?.role === "ADMIN" && zaloAlert && zaloAlert.level !== "ok" && (
+              <a
+                href="/admin/settings"
+                title="Xem cài đặt Zalo"
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                  zaloAlert.level === "expired"
+                    ? "bg-red-600 text-white border-red-700 animate-pulse shadow-md"
+                    : zaloAlert.level === "critical"
+                    ? "bg-red-50 text-red-700 border-red-200 animate-pulse shadow-sm"
+                    : "bg-amber-50 text-amber-700 border-amber-200"
+                }`}
+              >
+                <span className="text-sm">
+                  {zaloAlert.level === "expired" ? "⛔" : zaloAlert.level === "critical" ? "🔴" : "🟡"}
+                </span>
+                <span>
+                  {zaloAlert.level === "expired"
+                    ? "Zalo token hết hạn — Cập nhật ngay!"
+                    : zaloAlert.level === "unknown"
+                    ? "Zalo token: chưa xác định hạn — Nhập lại token"
+                    : zaloAlert.level === "critical"
+                    ? `Zalo token hết hạn trong ${zaloAlert.daysLeft} ngày`
+                    : `Zalo token còn ${zaloAlert.daysLeft} ngày`}
+                </span>
+                <span className="opacity-60">↗</span>
+              </a>
+            )}
             <NotificationBell />
           </div>
         </div>
