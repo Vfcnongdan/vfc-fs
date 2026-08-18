@@ -2,12 +2,12 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getRequestUser, apiError, apiOk } from "@/lib/request";
 import { DiagnosisStatus, Prisma } from "@prisma/client";
-import { cropGrowthStageOptions } from "@/lib/deseaseDetails";
+import { getCropOptionByType } from "@/lib/cropOptions";
 import {
   validateImagesWithGroq,
   runAiDiagnosis,
 } from "@/lib/aiDiagnosis";
-import { eqStr } from "@/lib/utils";
+
 
 export const maxDuration = 90;
 
@@ -106,9 +106,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Danh sách giai đoạn cho loại cây này
-    const availableStages =
-      cropGrowthStageOptions.find((o) => eqStr(o.cropType, cropType))
-        ?.growthStages ?? [];
+    const availableStages = getCropOptionByType(cropType)?.growthStages ?? [];
 
     console.log(
       `[AI Diagnosis Stage Check] ID: ${diagnosis.id}, Crop: ${cropType}, detectedStage: ${validationResult.detectedGrowthStage}, availableStages: ${availableStages.length}`

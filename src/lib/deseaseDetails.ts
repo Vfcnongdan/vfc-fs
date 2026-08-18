@@ -6,74 +6,221 @@ export type CropGrowthStageOptions = {
   severityLevels: string[];
 };
 
+/**
+ * @deprecated Dùng getCropOptionByType() từ @/lib/cropOptions thay thế.
+ * Data này chỉ còn dùng làm fallback khi file public/crop-options.json chưa tồn tại.
+ * Để cập nhật, bấm nút "Đồng bộ cấu hình cây trồng" trên trang AI Training.
+ */
 export const cropGrowthStageOptions: CropGrowthStageOptions[] = [
   {
-    cropType: "Bầu bí dưa",
-    growthStages: ["Cây con", "Phát triển thân lá", "Cơi đọt", "Ra hoa", "Nuôi trái"],
-    pestDiseases: ["Bệnh", "Sâu"],
-    severityLevels: ["Không có", "Nhẹ", "Trung bình", "Nặng"],
+    "cropType": "Sầu riêng",
+    "growthStages": [
+      "Sau thu hoạch",
+      "Cơi đọt",
+      "Phát triển thân lá",
+      "Ra hoa",
+      "Nuôi trái"
+    ],
+    "pestDiseases": [
+      "Sâu",
+      "Bệnh"
+    ],
+    "severityLevels": [
+      "Trung bình",
+      "Nặng",
+      "Không có",
+      "Nhẹ"
+    ]
   },
   {
-    cropType: "Hoa cúc",
-    growthStages: ["Ra hoa", "Cơi đọt"],
-    pestDiseases: ["Sâu", "Bệnh"],
-    severityLevels: ["Không có", "Nhẹ", "Trung bình", "Nặng", "Hết cứu"],
+    "cropType": "Hoa cúc",
+    "growthStages": [
+      "Ra hoa",
+      "Cơi đọt"
+    ],
+    "pestDiseases": [
+      "Sâu",
+      "Bệnh"
+    ],
+    "severityLevels": [
+      "Nhẹ",
+      "Trung bình",
+      "Nặng",
+      "Hết cứu",
+      "Không có"
+    ]
   },
   {
-    cropType: "Ớt",
-    growthStages: ["Cây con", "Ra hoa", "Nuôi trái"],
-    pestDiseases: ["Bệnh", "Sâu"],
-    severityLevels: ["Không có", "Nhẹ", "Trung bình", "Nặng"],
+    "cropType": "Bầu bí dưa",
+    "growthStages": [
+      "Cây con",
+      "Phá triển thân lá",
+      "Ra hoa",
+      "Cơi đọt",
+      "Nuôi trái"
+    ],
+    "pestDiseases": [
+      "Bệnh",
+      "Sâu"
+    ],
+    "severityLevels": [
+      "Không có",
+      "Nhẹ",
+      "Trung bình",
+      "Nặng"
+    ]
   },
   {
-    cropType: "Cà chua",
-    growthStages: ["Cây con", "Nuôi trái", "Phát triển thân lá"],
-    pestDiseases: ["Bệnh", "Sâu"],
-    severityLevels: ["Không có", "Nhẹ", "Trung bình", "Nặng", "Hết cứu"],
+    "cropType": "Ớt",
+    "growthStages": [
+      "Cây con",
+      "Nuôi trái",
+      "Ra hoa"
+    ],
+    "pestDiseases": [
+      "Bệnh",
+      "Sâu"
+    ],
+    "severityLevels": [
+      "Trung bình",
+      "Nhẹ",
+      "Nặng",
+      "Không có"
+    ]
   },
   {
-    cropType: "Bắp cải",
-    growthStages: ["Phát triển thân lá"],
-    pestDiseases: ["Sâu", "Bệnh"],
-    severityLevels: ["Không có", "Nhẹ", "Trung bình", "Nặng", "Hết cứu"],
+    "cropType": "Cà chua",
+    "growthStages": [
+      "Cây con",
+      "Nuôi trái",
+      "Phát triển thân lá"
+    ],
+    "pestDiseases": [
+      "Bệnh",
+      "Sâu"
+    ],
+    "severityLevels": [
+      "Không có",
+      "Nhẹ",
+      "Trung bình",
+      "Nặng",
+      "Hết cứu"
+    ]
   },
   {
-    cropType: "Cây hành",
-    growthStages: ["Cây con", "Phát triển thân lá"],
-    pestDiseases: ["Bệnh", "Sâu"],
-    severityLevels: ["Nhẹ", "Trung bình", "Nặng", "Hết cứu"],
+    "cropType": "Bắp cải",
+    "growthStages": [
+      "Phát triển thân lá"
+    ],
+    "pestDiseases": [
+      "Sâu",
+      "Bệnh"
+    ],
+    "severityLevels": [
+      "Nhẹ",
+      "Trung bình",
+      "Nặng",
+      "Không có"
+    ]
   },
   {
-    cropType: "Sầu riêng",
-    growthStages: ["Phát triển thân lá", "Sau thu hoạch", "Cơi đọt", "Ra hoa", "Nuôi trái"],
-    pestDiseases: ["Bệnh", "Sâu"],
-    severityLevels: ["Không có", "Nhẹ", "Trung bình", "Nặng"],
+    "cropType": "Cây hành",
+    "growthStages": [
+      "Cây con",
+      "Phá triển thân lá"
+    ],
+    "pestDiseases": [
+      "Bệnh",
+      "Sâu"
+    ],
+    "severityLevels": [
+      "Nhẹ",
+      "Trung bình",
+      "Nặng",
+      "Hết cứu"
+    ]
   },
   {
-    cropType: "Lúa",
-    growthStages: [
+    "cropType": "Cây Xoài",
+    "growthStages": [
+      "Nuôi trái"
+    ],
+    "pestDiseases": [
+      "Bệnh"
+    ],
+    "severityLevels": [
+      "Không có",
+      "Nhẹ",
+      "Trung bình",
+      "Nặng"
+    ]
+  },
+  {
+    "cropType": "Lúa",
+    "growthStages": [
       "Xuống giống",
       "Sau thu hoạch",
       "Mạ",
       "Đẻ nhánh - làm đòng",
       "Đẻ nhánh",
       "Làm đòng - trổ",
-      "Trước & sau trổ",
       "Trổ - chín",
+      "Trước & sau trổ"
     ],
-    pestDiseases: ["Cỏ", "Sâu", "Bệnh", "Rầy"],
-    severityLevels: ["Nhẹ", "Trung bình", "Nặng"],
+    "pestDiseases": [
+      "Cỏ",
+      "Sâu",
+      "Bệnh"
+    ],
+    "severityLevels": [
+      "Nặng",
+      "Nhẹ",
+      "Trung bình"
+    ]
   },
   {
-    cropType: "Cà phê",
-    growthStages: ["Sau thu hoạch", "Ra hoa", "Nuôi trái"],
-    pestDiseases: ["Bệnh", "Sâu"],
-    severityLevels: ["Không có", "Nhẹ", "Trung bình", "Nặng"],
+    "cropType": "Cà phê",
+    "growthStages": [
+      "Sau thu hoạch",
+      "Ra hoa",
+      "Nuôi trái",
+      "Cây con"
+    ],
+    "pestDiseases": [
+      "Bệnh",
+      "Sâu",
+      "Cỏ"
+    ],
+    "severityLevels": [
+      "Nhẹ",
+      "Trung bình",
+      "Nặng",
+      "Không có"
+    ]
   },
   {
-    cropType: "Xoài",
-    growthStages: ["Ra hoa", "Nuôi trái"],
-    pestDiseases: ["Bệnh", "Sâu"],
-    severityLevels: ["Không có", "Nhẹ", "Trung bình", "Nặng"],
+    "cropType": "Bắp",
+    "growthStages": [
+      "Cây con"
+    ],
+    "pestDiseases": [
+      "Cỏ"
+    ],
+    "severityLevels": [
+      "Trung bình"
+    ]
+  },
+  {
+    "cropType": "Cây có múi",
+    "growthStages": [
+      "Nuôi trái"
+    ],
+    "pestDiseases": [
+      "Bệnh"
+    ],
+    "severityLevels": [
+      "Nặng",
+      "Trung bình"
+    ]
   }
 ];

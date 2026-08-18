@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { cropGrowthStageOptions } from "@/lib/deseaseDetails";
+import { getCropOptionByType } from "@/lib/cropOptions";
 import { DiagnosisStatus } from "@prisma/client";
 import { eqStr, includesStr } from "@/lib/utils";
 
@@ -313,7 +313,7 @@ export async function validateImagesWithGroq(
     );
   }
 
-  const cropOption = cropGrowthStageOptions.find((o) => eqStr(o.cropType, cropType));
+  const cropOption = getCropOptionByType(cropType);
   const allowedStages = cropOption?.growthStages ?? [];
   const allowedPestDiseases = cropOption?.pestDiseases ?? [];
   const allowedSeverityLevels = cropOption?.severityLevels ?? [];

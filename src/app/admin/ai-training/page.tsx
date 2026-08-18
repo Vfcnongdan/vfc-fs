@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import toast from "react-hot-toast";
 import { getPreviewUrl, eqStr } from "@/lib/utils";
-import { cropGrowthStageOptions } from "@/lib/deseaseDetails";
+import type { CropGrowthStageOptions } from "@/lib/deseaseDetails";
 
 interface MultiSelectDropdownProps {
   label: string;
@@ -133,6 +133,10 @@ export default function AITrainingPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
 
+  // Crop options (fetched from static JSON)
+  const [cropOptionsList, setCropOptionsList] = useState<CropGrowthStageOptions[]>([]);
+  const [syncing, setSyncing] = useState(false);
+
   // Filters
   const [crops, setCrops] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedCrop, setSelectedCrop] = useState("");
@@ -142,8 +146,8 @@ export default function AITrainingPage() {
 
   // Danh sách lựa chọn cho bộ lọc, phụ thuộc vào cây trồng đang chọn
   const cropOption = useMemo(
-    () => cropGrowthStageOptions.find((o) => eqStr(o.cropType, selectedCrop)),
-    [selectedCrop],
+    () => cropOptionsList.find((o) => eqStr(o.cropType, selectedCrop)),
+    [selectedCrop, cropOptionsList],
   );
   const stageOptions = cropOption?.growthStages ?? [];
   const pestOptions = cropOption?.pestDiseases ?? [];
@@ -175,12 +179,19 @@ export default function AITrainingPage() {
   });
 
   const formCropOption = useMemo(
-    () => cropGrowthStageOptions.find((o) => eqStr(o.cropType, formData.cropType)),
-    [formData.cropType],
+    () => cropOptionsList.find((o) => eqStr(o.cropType, formData.cropType)),
+    [formData.cropType, cropOptionsList],
   );
   const formStageOptions = formCropOption?.growthStages ?? [];
   const formPestOptions = formCropOption?.pestDiseases ?? [];
   const formSeverityOptions = formCropOption?.severityLevels ?? [];
+
+  const fetchCropOptions = useCallback(() => {
+    fetch("/crop-options.json")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: CropGrowthStageOptions[]) => setCropOptionsList(data))
+      .catch(() => setCropOptionsList([]));
+  }, []);
 
   useEffect(() => {
     // Fetch crops for dropdown
@@ -190,7 +201,10 @@ export default function AITrainingPage() {
         setCrops((resData ?? []).map((c: any) => ({ id: c.id, name: c.name })));
       })
       .catch((err) => console.error("Failed to load crops:", err));
-  }, []);
+
+    // Fetch crop options from static JSON
+    fetchCropOptions();
+  }, [fetchCropOptions]);
 
   const fetchData = useCallback(async () => {
     if (!selectedCrop) {
@@ -393,6 +407,29 @@ export default function AITrainingPage() {
           <p className="mt-1 text-sm text-gray-500">Quản lý dữ liệu đối chứng hỗ trợ AI chẩn đoán dịch hại cây trồng.</p>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={async () => {
+              setSyncing(true);
+              try {
+                const res = await fetch("/api/admin/crop-options/sync", { method: "POST" });
+                const data = await res.json();
+                if (res.ok) {
+                  toast.success(data.message || "Đồng bộ thành công");
+                  fetchCropOptions();
+                } else {
+                  toast.error(data.error || "Đồng bộ thất bại");
+                }
+              } catch {
+                toast.error("Có lỗi xảy ra khi đồng bộ");
+              } finally {
+                setSyncing(false);
+              }
+            }}
+            disabled={syncing}
+            className="rounded-lg border border-amber-500 px-4 py-2 text-sm font-semibold text-amber-700 shadow-sm hover:bg-amber-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500 disabled:opacity-50"
+          >
+            {syncing ? "Đang đồng bộ..." : "🔄 Đồng bộ cấu hình"}
+          </button>
           <button
             onClick={handleOpenImport}
             className="rounded-lg border border-[#064E3B] px-4 py-2 text-sm font-semibold text-[#064E3B] shadow-sm hover:bg-[#064E3B]/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#064E3B]"
