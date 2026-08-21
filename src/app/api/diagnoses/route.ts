@@ -106,7 +106,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Danh sách giai đoạn cho loại cây này
-    const availableStages = getCropOptionByType(cropType)?.growthStages ?? [];
+    const cropOption = await getCropOptionByType(cropType ?? undefined);
+    const availableStages = cropOption?.growthStages ?? [];
 
     console.log(
       `[AI Diagnosis Stage Check] ID: ${diagnosis.id}, Crop: ${cropType}, detectedStage: ${validationResult.detectedGrowthStage}, availableStages: ${availableStages.length}`

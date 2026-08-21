@@ -1,12 +1,10 @@
 import { NextRequest } from "next/server";
-import fs from "fs";
-import path from "path";
 import { prisma } from "@/lib/prisma";
 import { getRequestUser, apiError, apiOk } from "@/lib/request";
 import { invalidateCropOptionsCache } from "@/lib/cropOptions";
 import type { CropGrowthStageOptions } from "@/lib/deseaseDetails";
 
-const OUTPUT_PATH = path.join(process.cwd(), "public", "crop-options.json");
+const CONFIG_KEY = "crop-options";
 
 export async function POST(request: NextRequest) {
   const user = await getRequestUser(request);
@@ -52,14 +50,71 @@ export async function POST(request: NextRequest) {
       severityLevels: [...g.severities],
     }));
 
-    // Ghi file ra public/
-    fs.writeFileSync(OUTPUT_PATH, JSON.stringify(options, null, 2), "utf-8");
+    // Lưu vào DB (upsert)
+    await prisma.systemConfig.upsert({
+      where: { key: CONFIG_KEY },
+      update: { value: options as any },
+      create: { key: CONFIG_KEY, value: options as any },
+    });
 
-    // Xóa cache server-side để lần đọc tiếp load file mới
+    // Đồng bộ bảng crops dựa vào crop-options
+    const activeCropNames = options.map((o) => o.cropType);
+
+    for (const cropName of activeCropNames) {
+      const existingCrop = await prisma.crop.findFirst({
+        where: { name: cropName },
+      });
+
+      if (existingCrop) {
+        // 1. Nếu bảng crops đã có cây đó (name) thì kiểm tra is_active phải bật true
+        if (!existingCrop.isActive) {
+          await prisma.crop.update({
+            where: { id: existingCrop.id },
+            data: { isActive: true },
+          });
+        }
+      } else {
+        // 2. Nếu bảng crops chưa có cây đó thì thêm cây đó dựa vào name
+        const cropCode = cropName
+          .toUpperCase()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/[^\w\s]/gi, "")
+          .replace(/\s+/g, "_");
+
+        let finalCropCode = cropCode;
+        let counter = 1;
+        while (await prisma.crop.findUnique({ where: { cropCode: finalCropCode } })) {
+          finalCropCode = `${cropCode}_${counter}`;
+          counter++;
+        }
+
+        await prisma.crop.create({
+          data: {
+            name: cropName,
+            cropCode: finalCropCode,
+            isActive: true,
+          },
+        });
+      }
+    }
+
+    // 3. Nếu name nào không có trong cropType của crop-options, is_active là false, đừng xóa
+    await prisma.crop.updateMany({
+      where: {
+        name: { notIn: activeCropNames },
+        isActive: true,
+      },
+      data: {
+        isActive: false,
+      },
+    });
+
+    // Xóa cache server-side để lần đọc tiếp load lại từ DB
     invalidateCropOptionsCache();
 
     console.log(
-      `[Crop Options Sync] Generated ${options.length} crop(s) from ${records.length} training records → ${OUTPUT_PATH}`,
+      `[Crop Options Sync] Generated ${options.length} crop(s) from ${records.length} training records → DB`,
     );
 
     return apiOk({

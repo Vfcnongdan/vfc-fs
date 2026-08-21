@@ -32,9 +32,15 @@ function naturalKey(r: {
 }
 
 function splitUrls(raw: string): string[] {
+  // Xử lý mọi dạng serialization phổ biến:
+  // - Postgres array: {"url1","url2"} hoặc {url1,url2}
+  // - JSON array:     ["url1","url2"]
+  // - Plain text:     url1\nurl2 hoặc url1,url2
   return (raw || "")
+    .trim()
+    .replace(/^\{|\}$|^\[|\]$/g, '')   // strip {} hoặc []
     .split(/[\n,]+/)
-    .map((u) => u.trim())
+    .map((u) => u.trim().replace(/^"|"$/g, '').replace(/^'|'$/g, ''))
     .filter(Boolean);
 }
 
@@ -76,6 +82,14 @@ export async function POST(request: NextRequest) {
     return apiError("Tệp CSV không có dữ liệu", 400);
   }
 
+  let hasIdColumn = false;
+  if (records.length > 0) {
+    const headerRow = records[0].map(h => String(h).toLowerCase().trim());
+    if (headerRow[0] === "id") {
+      hasIdColumn = true;
+    }
+  }
+
   // Bỏ dòng tiêu đề
   const dataRows = records.slice(1);
 
@@ -83,11 +97,17 @@ export async function POST(request: NextRequest) {
   let skippedInvalid = 0;
 
   for (const row of dataRows) {
-    const cropType = (row[0] || "").trim();
-    const growthStage = (row[1] || "").trim();
-    const pestDisease = (row[2] || "").trim();
-    const detail = (row[3] || "").trim();
-    const severityLevel = (row[4] || "").trim();
+    let offset = hasIdColumn ? 1 : 0;
+    // Tự động nhận diện nếu cột đầu là CUID (trường hợp header không khớp)
+    if (!hasIdColumn && row[0] && row[0].length >= 24 && row[0].startsWith('c') && !row[0].includes(' ')) {
+      offset = 1;
+    }
+
+    const cropType = (row[0 + offset] || "").trim();
+    const growthStage = (row[1 + offset] || "").trim();
+    const pestDisease = (row[2 + offset] || "").trim();
+    const detail = (row[3 + offset] || "").trim();
+    const severityLevel = (row[4 + offset] || "").trim();
 
     // Bỏ qua các dòng thiếu trường bắt buộc
     if (!cropType || !growthStage || !pestDisease || !detail || !severityLevel) {
@@ -101,11 +121,11 @@ export async function POST(request: NextRequest) {
       pestDisease,
       detail,
       severityLevel,
-      imageUrls: splitUrls(row[5] || ""),
-      description: (row[6] || "").trim(),
-      vfcSolution: (row[7] || "").trim(),
-      actionThreshold: (row[8] || "").trim(),
-      pestDensity: (row[9] || "").trim(),
+      imageUrls: splitUrls(row[5 + offset] || ""),
+      description: (row[6 + offset] || "").trim(),
+      vfcSolution: (row[7 + offset] || "").trim(),
+      actionThreshold: (row[8 + offset] || "").trim(),
+      pestDensity: (row[9 + offset] || "").trim(),
     });
   }
 

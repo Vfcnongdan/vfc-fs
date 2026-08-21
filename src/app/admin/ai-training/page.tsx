@@ -187,7 +187,7 @@ export default function AITrainingPage() {
   const formSeverityOptions = formCropOption?.severityLevels ?? [];
 
   const fetchCropOptions = useCallback(() => {
-    fetch("/crop-options.json")
+    fetch("/api/crop-options")
       .then((r) => (r.ok ? r.json() : []))
       .then((data: CropGrowthStageOptions[]) => setCropOptionsList(data))
       .catch(() => setCropOptionsList([]));
@@ -853,8 +853,29 @@ export default function AITrainingPage() {
                   className="block w-full text-sm text-gray-700 file:mr-3 file:rounded-md file:border-0 file:bg-[#064E3B] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-[#064E3B]/90"
                 />
                 <p className="text-xs text-gray-500">
-                  Cột theo thứ tự: Cây, Giai đoạn, Dịch hại, Chi tiết, Cấp độ, Hình ảnh, Thông tin mô tả,
-                  Biện pháp phòng trừ, Ngưỡng phòng trừ, Mật số.
+                  Cột theo thứ tự: Cây, Giai đoạn, Dịch hại, Chi tiết, Cấp độ, Hình ảnh (1 URL hoặc nhiều URL cách nhau bởi dấu phẩy trong ngoặc vuông: <code>[url1, url2]</code>), Thông tin mô tả,
+                  Biện pháp phòng trừ, Ngưỡng phòng trừ, Mật số.{" "}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const header = "Cây trồng,Giai đoạn,Dịch hại,Chi tiết dịch hại,Cấp độ,Hình ảnh,Thông tin mô tả,Biện pháp phòng trừ,Ngưỡng phòng trừ,Mật số";
+                      // Dòng 1: 1 hình
+                      const row1 = "Hoa cúc/ly,Ra hoa,Sâu,Sâu ăn nụ,Nhẹ,https://docs.google.com/uc?export=download&id=1_a0879vBfSwpoE_if2yPCKPBX6xAYP4m,Sâu xanh mới xuất hiện rải rác mật độ thấp.,Incipio 100DC luân phiên Solo 350SC,Phun phòng ngừa,Tuổi 1 mật độ thấp <10% nụ/lá có sâu.";
+                      // Dòng 2: nhiều hình → dùng dạng [url1, url2]
+                      const row2 = "Hoa cúc/ly,Ra hoa,Sâu,Sâu ăn nụ,Trung bình,[https://docs.google.com/uc?export=download&id=1RJ7kEZJFvhZoKLRW65ZBVJ3-EiNdaUpO, https://docs.google.com/uc?export=download&id=1IivrAdHcN17bO9OGphrJRoPeeTasgrB9],Sâu xanh tuổi 2-3 đục vào nụ 10-30% nụ bị hại.,Incipio 100DC luân phiên Solo 350SC,Phun phòng trị,10-30% số nụ có lỗ đục.";
+                      const bom = "\uFEFF";
+                      const csvContent = bom + header + "\n" + row1 + "\n" + row2;
+                      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+                      const link = document.createElement("a");
+                      link.href = URL.createObjectURL(blob);
+                      link.download = "ai-training-template.csv";
+                      link.click();
+                      URL.revokeObjectURL(link.href);
+                    }}
+                    className="text-[#064E3B] underline hover:text-[#064E3B]/80 font-medium"
+                  >
+                    Tải file mẫu
+                  </button>
                 </p>
               </div>
 

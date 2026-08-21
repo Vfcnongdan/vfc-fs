@@ -69,8 +69,25 @@ const INVALID_IMAGE_GUIDANCE: Record<
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-export async function fetchAndOptimizeImage(url: string): Promise<string | null> {
+export async function fetchAndOptimizeImage(rawUrl: string): Promise<string | null> {
   try {
+    let url = rawUrl.trim().replace(/^\{|\}$|^\[|\]$/g, '').replace(/^"|"$/g, '').replace(/^'|'$/g, '').trim();
+
+    // Chuyển đổi Google Drive share/view links → direct download link
+    if (url.includes('drive.google.com')) {
+      // https://drive.google.com/file/d/<ID>/view... → https://lh3.googleusercontent.com/d/<ID>
+      const fileMatch = url.match(/\/file\/d\/([^/?\s]+)/);
+      if (fileMatch) {
+        url = `https://lh3.googleusercontent.com/d/${fileMatch[1]}`;
+      } else {
+        // https://drive.google.com/uc?id=<ID> or https://drive.google.com/uc?export=download&id=<ID>
+        const ucMatch = url.match(/[?&]id=([^&\s]+)/);
+        if (ucMatch) {
+          url = `https://lh3.googleusercontent.com/d/${ucMatch[1]}`;
+        }
+      }
+    }
+
     const res = await fetch(url);
     if (!res.ok) return null;
     const arrayBuffer = await res.arrayBuffer();
@@ -81,7 +98,7 @@ export async function fetchAndOptimizeImage(url: string): Promise<string | null>
       .toBuffer();
     return buffer.toString("base64");
   } catch (err) {
-    console.error("Failed to fetch/optimize ref image:", url, err);
+    console.error("Failed to fetch/optimize ref image:", rawUrl, err);
     return null;
   }
 }
@@ -313,7 +330,7 @@ export async function validateImagesWithGroq(
     );
   }
 
-  const cropOption = getCropOptionByType(cropType);
+  const cropOption = await getCropOptionByType(cropType);
   const allowedStages = cropOption?.growthStages ?? [];
   const allowedPestDiseases = cropOption?.pestDiseases ?? [];
   const allowedSeverityLevels = cropOption?.severityLevels ?? [];

@@ -1,41 +1,46 @@
-import fs from "fs";
-import path from "path";
+import { prisma } from "./prisma";
 import {
   type CropGrowthStageOptions,
   cropGrowthStageOptions as fallbackOptions,
 } from "./deseaseDetails";
 import { eqStr } from "./utils";
 
-const FILE_PATH = path.join(process.cwd(), "public", "crop-options.json");
+const CONFIG_KEY = "crop-options";
 
 let cache: CropGrowthStageOptions[] | null = null;
 
-function loadOptions(): CropGrowthStageOptions[] {
+async function loadOptions(): Promise<CropGrowthStageOptions[]> {
   if (cache) return cache;
   try {
-    const raw = fs.readFileSync(FILE_PATH, "utf-8");
-    cache = JSON.parse(raw) as CropGrowthStageOptions[];
-    return cache!;
-  } catch {
-    // File chưa tồn tại → dùng hard-coded fallback
-    return fallbackOptions;
+    const config = await prisma.systemConfig.findUnique({
+      where: { key: CONFIG_KEY },
+    });
+    if (config) {
+      cache = config.value as CropGrowthStageOptions[];
+      return cache;
+    }
+  } catch (err) {
+    console.error("[cropOptions] Failed to load from DB, using fallback:", err);
   }
+  // DB chưa có data → dùng hard-coded fallback
+  return fallbackOptions;
 }
 
-/** Xóa cache in-memory, lần đọc tiếp sẽ load lại file từ disk */
+/** Xóa cache in-memory, lần đọc tiếp sẽ query lại DB */
 export function invalidateCropOptionsCache() {
   cache = null;
 }
 
-/** Lấy toàn bộ crop options (đọc từ file, cached in-memory) */
-export function getCropOptions(): CropGrowthStageOptions[] {
+/** Lấy toàn bộ crop options (DB-backed, cached in-memory) */
+export async function getCropOptions(): Promise<CropGrowthStageOptions[]> {
   return loadOptions();
 }
 
 /** Lấy options cho 1 crop cụ thể (case & accent insensitive) */
-export function getCropOptionByType(
+export async function getCropOptionByType(
   cropType?: string | null,
-): CropGrowthStageOptions | null {
+): Promise<CropGrowthStageOptions | null> {
   if (!cropType) return null;
-  return loadOptions().find((o) => eqStr(o.cropType, cropType)) ?? null;
+  const options = await loadOptions();
+  return options.find((o) => eqStr(o.cropType, cropType)) ?? null;
 }
