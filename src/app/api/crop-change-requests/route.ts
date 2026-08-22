@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
   const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
   const limit = 20;
 
-  const isMdo = user.role === "MDO";
+  const isMdo = user.role === "MDO" || user.role === "MDM" || user.role === "CV_CM";
   const isAdmin = user.role === "ADMIN";
   if (!isMdo && !isAdmin) {
     return apiError("FORBIDDEN", 403);

@@ -19,6 +19,10 @@ interface User {
   } | null;
 }
 
+const ALL_ROLES = [
+  "FARMER", "SALE", "AGENCY", "SUPER_AGENT", "MDO", "MDM", "CV_CM", "SE", "ASM", "TSM", "BGD", "ADMIN",
+] as const;
+
 export default function UserManagementPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [total, setTotal] = useState(0);
@@ -26,6 +30,8 @@ export default function UserManagementPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState("");
+  const [activeFilter, setActiveFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -48,12 +54,19 @@ export default function UserManagementPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
+  // Reset page khi filter thay đổi
+  useEffect(() => { setPage(1); }, [roleFilter, activeFilter]);
+
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(
-        `/api/admin/users?q=${debouncedSearch}&page=${page}`,
-      );
+      const params = new URLSearchParams({
+        q: debouncedSearch,
+        page: String(page),
+        ...(roleFilter && { role: roleFilter }),
+        ...(activeFilter && { isActive: activeFilter }),
+      });
+      const res = await fetch(`/api/admin/users?${params}`);
       if (res.ok) {
         const data = await res.json();
         setUsers(data.users);
@@ -65,7 +78,7 @@ export default function UserManagementPage() {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, page]);
+  }, [debouncedSearch, page, roleFilter, activeFilter]);
 
   useEffect(() => {
     fetchUsers();
@@ -201,32 +214,90 @@ export default function UserManagementPage() {
           </h1>
         </div>
 
-        <div className="flex items-center gap-4">
-          <div className="relative flex-1 max-w-md">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400">
-              🔍
-            </span>
-            <input
-              type="text"
-              placeholder="Tìm theo số điện thoại..."
-              className="w-full pl-10 pr-4 py-2 rounded-xl border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition shadow-sm"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+        <div className="flex flex-col gap-3">
+          {/* Row 1: Search + Add button */}
+          <div className="flex items-center gap-3">
+            <div className="relative flex-1 max-w-md">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 text-sm">
+                🔍
+              </span>
+              <input
+                type="text"
+                placeholder="Tìm theo tên hoặc số điện thoại..."
+                className="w-full pl-10 pr-4 py-2 rounded-xl border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition shadow-sm text-sm"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+
+            {/* Role filter */}
+            <select
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value)}
+              className="px-3 py-2 rounded-xl border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm bg-white shadow-sm"
+            >
+              <option value="">Tất cả Role</option>
+              {ALL_ROLES.map((r) => (
+                <option key={r} value={r}>{r}</option>
+              ))}
+            </select>
+
+            {/* Active filter */}
+            <select
+              value={activeFilter}
+              onChange={(e) => setActiveFilter(e.target.value)}
+              className="px-3 py-2 rounded-xl border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm bg-white shadow-sm"
+            >
+              <option value="">Mọi trạng thái</option>
+              <option value="true">✅ Hoạt động</option>
+              <option value="false">🚫 Bị chặn</option>
+            </select>
+
+            {/* Clear filters */}
+            {(roleFilter || activeFilter || search) && (
+              <button
+                onClick={() => { setSearch(""); setRoleFilter(""); setActiveFilter(""); }}
+                className="px-3 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-500 hover:bg-neutral-50 hover:text-neutral-800 transition whitespace-nowrap"
+                title="Xóa bộ lọc"
+              >
+                ✕ Xóa lọc
+              </button>
+            )}
+
+            <div className="ml-auto flex items-center gap-3">
+              <span className="text-sm text-neutral-500 whitespace-nowrap">
+                <span className="font-bold text-neutral-800">{total}</span> người dùng
+              </span>
+              <button
+                onClick={() => {
+                  setSelectedUser(null);
+                  setIsEditModalOpen(true);
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold transition shadow-lg shadow-green-600/20 text-sm whitespace-nowrap"
+              >
+                <span>+</span> Thêm người dùng
+              </button>
+            </div>
           </div>
-          <div className="text-sm text-neutral-500 flex-1 text-right">
-            Tổng cộng:{" "}
-            <span className="font-bold text-neutral-800">{total}</span>
-          </div>
-          <button
-            onClick={() => {
-              setSelectedUser(null);
-              setIsEditModalOpen(true);
-            }}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold transition shadow-lg shadow-green-600/20"
-          >
-            <span>+</span> Thêm người dùng
-          </button>
+
+          {/* Active filter badges */}
+          {(roleFilter || activeFilter) && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-neutral-400">Bộ lọc:</span>
+              {roleFilter && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-green-50 border border-green-200 text-green-700 text-xs font-bold">
+                  Role: {roleFilter}
+                  <button onClick={() => setRoleFilter("")} className="ml-1 hover:text-green-900">×</button>
+                </span>
+              )}
+              {activeFilter && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-bold">
+                  {activeFilter === "true" ? "✅ Hoạt động" : "🚫 Bị chặn"}
+                  <button onClick={() => setActiveFilter("")} className="ml-1 hover:text-blue-900">×</button>
+                </span>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -299,8 +370,16 @@ export default function UserManagementPage() {
                                     ? "bg-cyan-100 text-cyan-700"
                                     : user.role === "MDO"
                                       ? "bg-indigo-100 text-indigo-700"
+                                    : user.role === "MDM"
+                                      ? "bg-indigo-100 text-indigo-600"
+                                    : user.role === "CV_CM"
+                                      ? "bg-violet-100 text-violet-700"
                                     : user.role === "SE"
                                       ? "bg-rose-100 text-rose-700"
+                                    : user.role === "ASM"
+                                      ? "bg-rose-100 text-rose-600"
+                                    : user.role === "TSM"
+                                      ? "bg-pink-100 text-pink-700"
                                       : user.role === "BGD"
                                         ? "bg-slate-800 text-white"
                                         : "bg-green-100 text-green-700"
@@ -371,27 +450,65 @@ export default function UserManagementPage() {
         </div>
 
         {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="px-6 py-4 border-t border-neutral-100 flex items-center justify-between bg-white shrink-0">
+        <div className="px-6 py-4 border-t border-neutral-100 flex items-center justify-between bg-white shrink-0 gap-4">
+          <p className="text-xs text-neutral-400">
+            Trang <span className="font-bold text-neutral-700">{page}</span> / <span className="font-bold text-neutral-700">{Math.max(totalPages, 1)}</span>
+            {" "}· <span className="font-bold text-neutral-700">{total}</span> kết quả
+          </p>
+          <div className="flex items-center gap-1">
+            <button
+              disabled={page === 1}
+              onClick={() => setPage(1)}
+              className="px-2 py-1.5 rounded-lg border border-neutral-200 text-xs disabled:opacity-40 hover:bg-neutral-50 transition font-medium"
+              title="Trang đầu"
+            >
+              «
+            </button>
             <button
               disabled={page === 1}
               onClick={() => setPage((p) => p - 1)}
-              className="px-3 py-1.5 rounded-lg border border-neutral-200 text-sm disabled:opacity-50 hover:bg-neutral-50 transition"
+              className="px-3 py-1.5 rounded-lg border border-neutral-200 text-xs disabled:opacity-40 hover:bg-neutral-50 transition font-medium"
             >
-              Trước
+              ← Trước
             </button>
-            <div className="text-sm font-medium text-neutral-600">
-              Trang {page} / {totalPages}
-            </div>
+
+            {/* Page number buttons */}
+            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+              const start = Math.max(1, Math.min(page - 2, totalPages - 4));
+              const p = start + i;
+              if (p > totalPages) return null;
+              return (
+                <button
+                  key={p}
+                  onClick={() => setPage(p)}
+                  className={`w-8 h-8 rounded-lg text-xs font-bold transition ${
+                    p === page
+                      ? "bg-green-600 text-white border border-green-600 shadow-sm"
+                      : "border border-neutral-200 text-neutral-600 hover:bg-neutral-50"
+                  }`}
+                >
+                  {p}
+                </button>
+              );
+            })}
+
             <button
-              disabled={page === totalPages}
+              disabled={page === totalPages || totalPages === 0}
               onClick={() => setPage((p) => p + 1)}
-              className="px-3 py-1.5 rounded-lg border border-neutral-200 text-sm disabled:opacity-50 hover:bg-neutral-50 transition"
+              className="px-3 py-1.5 rounded-lg border border-neutral-200 text-xs disabled:opacity-40 hover:bg-neutral-50 transition font-medium"
             >
-              Tiếp
+              Tiếp →
+            </button>
+            <button
+              disabled={page === totalPages || totalPages === 0}
+              onClick={() => setPage(totalPages)}
+              className="px-2 py-1.5 rounded-lg border border-neutral-200 text-xs disabled:opacity-40 hover:bg-neutral-50 transition font-medium"
+              title="Trang cuối"
+            >
+              »
             </button>
           </div>
-        )}
+        </div>
       </div>
 
       {/* Create/Edit Modal */}
@@ -448,7 +565,11 @@ export default function UserManagementPage() {
                   <option value="AGENCY">AGENCY (Đại lý)</option>
                   <option value="SUPER_AGENT">SUPER_AGENT (Tổng đại lý)</option>
                   <option value="MDO">MDO (Quảng bá sản phẩm)</option>
+                  <option value="MDM">MDM (Quản lý địa bàn)</option>
+                  <option value="CV_CM">CV_CM (Chuyên viên chăm sóc)</option>
                   <option value="SE">SE (Kỹ sư khu vực)</option>
+                  <option value="ASM">ASM (Quản lý khu vực kinh doanh)</option>
+                  <option value="TSM">TSM (Quản lý kinh doanh lãnh thổ)</option>
                   <option value="BGD">BGD (Ban giám đốc)</option>
                   <option value="ADMIN">ADMIN (Quản trị viên)</option>
                 </select>
@@ -592,9 +713,17 @@ export default function UserManagementPage() {
                             ? "🚀"
                           : selectedUser.role === "MDO"
                             ? "📢"
-                            : selectedUser.role === "SE"
-                              ? "📐"
-                              : "👩‍🌾"}
+                            : selectedUser.role === "MDM"
+                              ? "📊"
+                              : selectedUser.role === "CV_CM"
+                                ? "🎯"
+                                : selectedUser.role === "SE"
+                                  ? "📐"
+                                  : selectedUser.role === "ASM"
+                                    ? "🗂️"
+                                    : selectedUser.role === "TSM"
+                                      ? "📋"
+                                      : "👩‍🌾"}
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-neutral-800">

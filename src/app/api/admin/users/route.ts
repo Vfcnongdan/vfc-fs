@@ -9,13 +9,31 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url);
   const q = searchParams.get("q") || "";
+  const roleFilter = searchParams.get("role") || "";
+  const activeFilter = searchParams.get("isActive") || "";
   const page = parseInt(searchParams.get("page") || "1");
   const take = 20;
   const skip = (page - 1) * take;
 
-  const where = q ? {
-    phone: { contains: q, mode: 'insensitive' as const }
-  } : {};
+  const andClauses: Record<string, unknown>[] = [];
+
+  if (q) {
+    andClauses.push({
+      OR: [
+        { phone: { contains: q, mode: "insensitive" } },
+        { name: { contains: q, mode: "insensitive" } },
+      ],
+    });
+  }
+
+  if (roleFilter && Object.values(Role).includes(roleFilter as Role)) {
+    andClauses.push({ role: roleFilter as Role });
+  }
+
+  if (activeFilter === "true") andClauses.push({ isActive: true });
+  else if (activeFilter === "false") andClauses.push({ isActive: false });
+
+  const where = andClauses.length > 0 ? { AND: andClauses } : {};
 
   const [total, users] = await Promise.all([
     prisma.user.count({ where }),
@@ -39,6 +57,7 @@ export async function GET(request: NextRequest) {
     totalPages: Math.ceil(total / take)
   });
 }
+
 
 export async function POST(request: NextRequest) {
   const admin = await getRequestUser(request);
@@ -68,3 +87,4 @@ export async function POST(request: NextRequest) {
     return apiError("Internal Server Error", 500);
   }
 }
+

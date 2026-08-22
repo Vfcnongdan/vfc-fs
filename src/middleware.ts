@@ -5,7 +5,7 @@ import { verifyToken, COOKIE_NAME, Role } from "@/lib/auth";
 const PUBLIC_PATHS = ["/", "/assets", "/api/auth/otp/send", "/api/auth/otp/verify", "/api/auth/zalo/callback", "/zalo_verifierOyIX99Bk6tXmqSnrjELRVNV3wrIRjJ4FCpap.html"];
 const ROLE_PATHS: Record<string, Role[]> = {
   "/api/admin": [Role.ADMIN],
-  "/admin/orders": [Role.ADMIN, Role.AGENCY, Role.SUPER_AGENT, Role.MDO, Role.SE],
+  "/admin/orders": [Role.ADMIN, Role.AGENCY, Role.SUPER_AGENT, Role.MDO, Role.SE, Role.MDM, Role.CV_CM, Role.ASM, Role.TSM],
   "/admin/products": [Role.ADMIN],
   "/admin/system": [Role.ADMIN],
   "/sale": [Role.SALE, Role.ADMIN],

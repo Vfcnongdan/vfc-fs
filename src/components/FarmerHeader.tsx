@@ -7,7 +7,7 @@ import { LogoutButton } from "@/components/LogoutButton";
 import { NotificationBell } from "@/components/NotificationBell";
 import { CartButton } from "@/components/CartButton";
 
-const NON_FARMER_ROLES = ["ADMIN", "SALE", "AGENCY", "SUPER_AGENT", "MDO", "SE", "BGD"];
+const NON_FARMER_ROLES = ["ADMIN", "SALE", "AGENCY", "SUPER_AGENT", "MDO", "SE", "BGD", "MDM", "CV_CM", "ASM", "TSM"];
 
 export function FarmerHeader() {
   const [role, setRole] = useState<string | null>(null);

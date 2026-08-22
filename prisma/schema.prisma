@@ -387,6 +387,10 @@ enum Role {
   MDO
   SE
   BGD
+  MDM
+  CV_CM
+  ASM
+  TSM
 }
 
 enum OrderStatus {

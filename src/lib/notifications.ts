@@ -122,7 +122,7 @@ export function notificationHrefForRole(
   }
   if (!orderId) return `/farmer`;
   if (role === "FARMER") return `/farmer/orders/${orderId}`;
-  if (role === "AGENCY" || role === "SUPER_AGENT" || role === "MDO" || role === "SE") {
+  if (role === "AGENCY" || role === "SUPER_AGENT" || role === "MDO" || role === "SE" || role === "MDM" || role === "CV_CM" || role === "ASM" || role === "TSM") {
     return `/admin/orders?orderId=${orderId}`;
   }
   return `/admin/orders?orderId=${orderId}`;

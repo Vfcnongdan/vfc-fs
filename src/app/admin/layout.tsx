@@ -44,9 +44,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       .catch(() => {});
   }, [user]);
 
-  const canSeeOrders = user?.role === "ADMIN" || user?.role === "AGENCY" || user?.role === "SUPER_AGENT" || user?.role === "MDO" || user?.role === "SE";
+  const canSeeOrders = user?.role === "ADMIN" || user?.role === "AGENCY" || user?.role === "SUPER_AGENT" || user?.role === "MDO" || user?.role === "SE" || user?.role === "MDM" || user?.role === "CV_CM" || user?.role === "ASM" || user?.role === "TSM";
   const isAdminOnly = user?.role === "ADMIN";
-  const isMdo = user?.role === "MDO";
+  const isMdo = user?.role === "MDO" || user?.role === "MDM" || user?.role === "CV_CM";
 
   const menuItems = [
     { href: "/admin", icon: "📈", label: "Tổng quan", show: true },

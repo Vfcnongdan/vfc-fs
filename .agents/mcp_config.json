@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "atlassian": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-atlassian@2.1.0"
+      ],
+      "env": {
+        "JIRA_URL": "https://vfcnongdan.atlassian.net",
+        "JIRA_USERNAME": "thaipeace200284@gmail.com",
+        "JIRA_API_TOKEN": "ATATT3xFfGF0Tw0CHp_B61cESPrMR-erZuCJfjohxi8AdSXSSB9B_y6lO3HLhEZBTP0AThrwCT-Ypma-YSnpvxXAXZzU36LNh7u-AauciYZ29Jp0djru8aAQVbCBj2GJ5pRp0Q_GfCNk_ZdZeWLJBei-5bXYTMuADEuQX_82Ew2Vj7pboS884Wo=7C671A0C"
+      }
+    }
+  }
+}
