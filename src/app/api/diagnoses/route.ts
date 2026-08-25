@@ -101,13 +101,6 @@ async function proxyListDiagnoses(request: NextRequest, user: any) {
     );
   }
 }
-    console.error("[Proxy GET Diagnoses Error]", err);
-    return apiError(
-      "Không thể kết nối đến dịch vụ chẩn đoán AI. Vui lòng thử lại sau.",
-      502
-    );
-  }
-}
 
 // ─── Legacy Monolith Handlers (Fallback) ──────────────────────────────────────
 
