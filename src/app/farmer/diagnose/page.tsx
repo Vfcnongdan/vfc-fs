@@ -635,12 +635,44 @@ export default function DiagnosePage() {
   }
 
   async function pollResult(id: string) {
-    for (let i = 0; i < 20; i++) {
-      await new Promise((r) => setTimeout(r, 3000));
+    for (let i = 0; i < 30; i++) {
+      await new Promise((r) => setTimeout(r, 2000));
       const res = await fetch(`/api/diagnoses/${id}`);
       const data = await res.json();
+      console.log("[Diagnose Poll Response]", data);
+
+      if (data.wrongCrop) {
+        setResult(data);
+        return;
+      }
+
+      if (data.awaitingStage) {
+        console.log("[Diagnose Poll] Awaiting stage, setting UI...");
+        const detectedStage = data.detectedGrowthStage ?? null;
+        setStageConfirmationDeclined(!detectedStage);
+        setStageConfirmCountdown(detectedStage ? 30 : 0);
+        setAwaitingStage({
+          diagnosisId: data.id,
+          availableStages: data.availableStages ?? [],
+          detectedGrowthStage: detectedStage,
+        });
+        setResult({ id: data.id, status: "PROCESSING" });
+        setAnalyzeProgress(0);
+        return;
+      }
+
+      if (data.status === "DONE" || data.suggestions) {
+        setResult(data);
+        return;
+      }
+
+      if (data.status === "FAILED") {
+        setError(data.summary || NEED_CLEARER_IMAGE_MESSAGE);
+        setResult(data);
+        return;
+      }
+
       setResult(data);
-      if (data.status !== "PROCESSING") return;
     }
   }
 
