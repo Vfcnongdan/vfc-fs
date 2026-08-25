@@ -591,7 +591,7 @@ export default function DiagnosePage() {
         setResult({ id: data.id, status: "PROCESSING" });
         setAnalyzeProgress(0);
         setLoading(false);
-      } else if (data.status === "DONE" || data.suggestions) {
+      } else if (data.status === "DONE") {
         setResult(data);
         setLoading(false);
       } else {
@@ -607,6 +607,7 @@ export default function DiagnosePage() {
 
   async function handleSelectStage(stage: string) {
     if (!awaitingStage) return;
+    const currentDiagId = awaitingStage.diagnosisId;
     setAwaitingStage(null);
     setStageConfirmationDeclined(false);
     setAnalyzeProgress(0);
@@ -614,7 +615,7 @@ export default function DiagnosePage() {
     setError("");
 
     try {
-      const res = await fetch(`/api/diagnoses/${awaitingStage.diagnosisId}`, {
+      const res = await fetch(`/api/diagnoses/${currentDiagId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -625,8 +626,8 @@ export default function DiagnosePage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
-      setResult({ id: awaitingStage.diagnosisId, status: "PROCESSING" });
-      await pollResult(awaitingStage.diagnosisId);
+      setResult({ id: currentDiagId, status: "PROCESSING" });
+      await pollResult(currentDiagId);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : NEED_CLEARER_IMAGE_MESSAGE);
     } finally {
@@ -635,7 +636,7 @@ export default function DiagnosePage() {
   }
 
   async function pollResult(id: string) {
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 45; i++) {
       await new Promise((r) => setTimeout(r, 2000));
       const res = await fetch(`/api/diagnoses/${id}`);
       const data = await res.json();
@@ -661,7 +662,7 @@ export default function DiagnosePage() {
         return;
       }
 
-      if (data.status === "DONE" || data.suggestions) {
+      if (data.status === "DONE") {
         setResult(data);
         return;
       }
