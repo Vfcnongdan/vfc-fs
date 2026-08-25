@@ -36,6 +36,7 @@ async function proxyGetDiagnosis(id: string, user: any) {
         "x-user-id": user.id,
         "x-user-role": user.role,
       },
+      signal: AbortSignal.timeout(15000),
     });
 
     const data = await response.json();
@@ -43,7 +44,7 @@ async function proxyGetDiagnosis(id: string, user: any) {
   } catch (err: any) {
     console.error("[Proxy GET Diagnosis Detail Error]", err);
     return apiError(
-      "Không thể kết nối đến dịch vụ chẩn đoán AI. Vui lòng thử lại sau.",
+      `Không thể kết nối đến dịch vụ chẩn đoán AI (${err.message}). Vui lòng thử lại sau.`,
       502
     );
   }
@@ -62,6 +63,7 @@ async function proxyConfirmStage(request: NextRequest, id: string, user: any) {
         "x-user-role": user.role,
       },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(20000),
     });
 
     const data = await response.json();
@@ -69,7 +71,7 @@ async function proxyConfirmStage(request: NextRequest, id: string, user: any) {
   } catch (err: any) {
     console.error("[Proxy PATCH Stage Error]", err);
     return apiError(
-      "Không thể kết nối đến dịch vụ chẩn đoán AI. Vui lòng thử lại sau.",
+      `Không thể kết nối đến dịch vụ chẩn đoán AI (${err.message}). Vui lòng thử lại sau.`,
       502
     );
   }

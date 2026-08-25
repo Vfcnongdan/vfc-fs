@@ -47,6 +47,10 @@ async function proxyCreateDiagnosis(request: NextRequest, user: any) {
     buffer = null;
   }
 
+  console.log(
+    `[Proxy POST Diagnosis] Sending to ${MICROSERVICE_URL}/api/v1/diagnoses | User: ${user.id} | Crop: ${cropType}`
+  );
+
   try {
     const response = await fetch(`${MICROSERVICE_URL}/api/v1/diagnoses`, {
       method: "POST",
@@ -60,6 +64,7 @@ async function proxyCreateDiagnosis(request: NextRequest, user: any) {
         base64ImagesSmall,
         cropType,
       }),
+      signal: AbortSignal.timeout(35000),
     });
 
     const data = await response.json();
@@ -67,7 +72,7 @@ async function proxyCreateDiagnosis(request: NextRequest, user: any) {
   } catch (err: any) {
     console.error("[Proxy POST Diagnosis Error]", err);
     return apiError(
-      "Không thể kết nối đến dịch vụ chẩn đoán AI. Vui lòng thử lại sau.",
+      `Không thể kết nối đến dịch vụ chẩn đoán AI (${err.message}). Vui lòng thử lại sau.`,
       502
     );
   }
@@ -82,12 +87,20 @@ async function proxyListDiagnoses(request: NextRequest, user: any) {
           "x-user-id": user.id,
           "x-user-role": user.role,
         },
+        signal: AbortSignal.timeout(15000),
       }
     );
 
     const data = await response.json();
     return apiOk(data, response.status);
   } catch (err: any) {
+    console.error("[Proxy GET Diagnoses Error]", err);
+    return apiError(
+      "Không thể kết nối đến dịch vụ chẩn đoán AI. Vui lòng thử lại sau.",
+      502
+    );
+  }
+}
     console.error("[Proxy GET Diagnoses Error]", err);
     return apiError(
       "Không thể kết nối đến dịch vụ chẩn đoán AI. Vui lòng thử lại sau.",
