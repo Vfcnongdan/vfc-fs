@@ -30,3 +30,4 @@ public/uploads/
 .commandcode/*
 .vercel
 .env*
+docs/production_readiness_100k_users.md
