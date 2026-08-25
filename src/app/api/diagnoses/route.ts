@@ -64,7 +64,7 @@ async function proxyCreateDiagnosis(request: NextRequest, user: any) {
         base64ImagesSmall,
         cropType,
       }),
-      signal: AbortSignal.timeout(35000),
+      signal: AbortSignal.timeout(60000),
     });
 
     const data = await response.json();
@@ -87,7 +87,7 @@ async function proxyListDiagnoses(request: NextRequest, user: any) {
           "x-user-id": user.id,
           "x-user-role": user.role,
         },
-        signal: AbortSignal.timeout(15000),
+        signal: AbortSignal.timeout(60000),
       }
     );
 

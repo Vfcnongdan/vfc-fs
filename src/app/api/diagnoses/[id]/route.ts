@@ -36,7 +36,7 @@ async function proxyGetDiagnosis(id: string, user: any) {
         "x-user-id": user.id,
         "x-user-role": user.role,
       },
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(60000),
     });
 
     const data = await response.json();
@@ -63,7 +63,7 @@ async function proxyConfirmStage(request: NextRequest, id: string, user: any) {
         "x-user-role": user.role,
       },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(20000),
+      signal: AbortSignal.timeout(60000),
     });
 
     const data = await response.json();
