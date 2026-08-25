@@ -8,14 +8,97 @@ import {
   runAiDiagnosis,
 } from "@/lib/aiDiagnosis";
 
-
 export const maxDuration = 90;
 
-// POST /api/diagnoses — farmer submits photo for AI diagnosis
-export async function POST(request: NextRequest) {
-  const user = await getRequestUser(request);
-  if (!user) return apiError("UNAUTHORIZED", 401);
+const MICROSERVICE_URL =
+  process.env.DIAGNOSIS_SERVICE_URL || "http://localhost:3001";
+const USE_MICROSERVICE =
+  process.env.USE_DIAGNOSIS_MICROSERVICE === "true";
 
+// ─── Microservice Proxy Handlers ─────────────────────────────────────────────
+
+async function proxyCreateDiagnosis(request: NextRequest, user: any) {
+  const formData = await request.formData().catch(() => null);
+  if (!formData) return apiError("INVALID_FORM_DATA", 400);
+
+  const cropType = (formData.get("cropType") as string) || undefined;
+  const files = formData.getAll("images") as File[];
+  if (!files.length) return apiError("NO_IMAGES", 400);
+
+  const base64Images: string[] = [];
+  const base64ImagesSmall: string[] = [];
+  const sharp = (await import("sharp")).default;
+
+  for (const file of files) {
+    let buffer: Buffer | null = Buffer.from(await file.arrayBuffer());
+
+    const optimizedBuffer = await sharp(buffer)
+      .resize(512, 512, { fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: 85 })
+      .toBuffer();
+    base64Images.push(optimizedBuffer.toString("base64"));
+
+    const smallBuffer = await sharp(buffer)
+      .resize(256, 256, { fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: 40 })
+      .toBuffer();
+    base64ImagesSmall.push(smallBuffer.toString("base64"));
+
+    buffer = null;
+  }
+
+  try {
+    const response = await fetch(`${MICROSERVICE_URL}/api/v1/diagnoses`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-user-id": user.id,
+        "x-user-role": user.role,
+      },
+      body: JSON.stringify({
+        base64Images,
+        base64ImagesSmall,
+        cropType,
+      }),
+    });
+
+    const data = await response.json();
+    return apiOk(data, response.status);
+  } catch (err: any) {
+    console.error("[Proxy POST Diagnosis Error]", err);
+    return apiError(
+      "Không thể kết nối đến dịch vụ chẩn đoán AI. Vui lòng thử lại sau.",
+      502
+    );
+  }
+}
+
+async function proxyListDiagnoses(request: NextRequest, user: any) {
+  try {
+    const response = await fetch(
+      `${MICROSERVICE_URL}/api/v1/diagnoses?${request.nextUrl.searchParams}`,
+      {
+        headers: {
+          "x-user-id": user.id,
+          "x-user-role": user.role,
+        },
+      }
+    );
+
+    const data = await response.json();
+    return apiOk(data, response.status);
+  } catch (err: any) {
+    console.error("[Proxy GET Diagnoses Error]", err);
+    return apiError(
+      "Không thể kết nối đến dịch vụ chẩn đoán AI. Vui lòng thử lại sau.",
+      502
+    );
+  }
+}
+
+// ─── Legacy Monolith Handlers (Fallback) ──────────────────────────────────────
+
+async function legacyCreateDiagnosis(request: NextRequest, user: any) {
   const formData = await request.formData().catch(() => null);
   if (!formData) return apiError("INVALID_FORM_DATA", 400);
 
@@ -64,7 +147,6 @@ export async function POST(request: NextRequest) {
     );
 
     if (!validationResult.isValid) {
-      // WRONG_CROP: cây đúng nhưng sai loại → trả thông tin hữu ích, 200 OK (điểm cuối)
       if (validationResult.reasonCode === "WRONG_CROP") {
         const wrongCropSummary = validationResult.plantInfo
           ? `Thông tin dịch hại trên cây trồng bạn đưa không chính xác. Đây là một số thông tin hữu ích về cây này:\n${validationResult.plantInfo}\n\nĐể được hỗ trợ hiệu quả từ VFC xin cung cấp thông tin và hình ảnh chính xác.`
@@ -90,7 +172,6 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // NOT_A_PLANT, BLURRY_IMAGE → trả 400 như cũ
       await prisma.plantDiagnosis.update({
         where: { id: diagnosis.id },
         data: {
@@ -105,7 +186,6 @@ export async function POST(request: NextRequest) {
       return apiError(validationResult.userGuidance, 400);
     }
 
-    // Danh sách giai đoạn cho loại cây này
     const cropOption = await getCropOptionByType(cropType ?? undefined);
     const availableStages = cropOption?.growthStages ?? [];
 
@@ -113,8 +193,6 @@ export async function POST(request: NextRequest) {
       `[AI Diagnosis Stage Check] ID: ${diagnosis.id}, Crop: ${cropType}, detectedStage: ${validationResult.detectedGrowthStage}, availableStages: ${availableStages.length}`
     );
 
-    // Luôn yêu cầu xác nhận giai đoạn khi loại cây có danh sách giai đoạn,
-    // bất kể AI validation có phát hiện được detectedGrowthStage hay không.
     if (availableStages.length > 0) {
       const awaitingPayload = {
         awaitingStage: true,
@@ -127,7 +205,7 @@ export async function POST(request: NextRequest) {
         where: { id: diagnosis.id },
         data: {
           rawAiResponse: awaitingPayload,
-          status: DiagnosisStatus.DONE, // dừng polling, client tự xử lý
+          status: DiagnosisStatus.DONE,
         },
       });
       console.log(
@@ -142,7 +220,6 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Chạy analysis
     console.log(
       `[POST AI Diagnosis] Start AI diagnosis | ID: ${diagnosis.id} | Crop: ${cropType} | Stage: ${growthStage ?? validationResult.detectedGrowthStage ?? "any"} | Pest: ${validationResult.detectedPestDisease ?? "any"} | Severity: ${validationResult.detectedSeverityLevel ?? "any"}`
     );
@@ -179,11 +256,7 @@ export async function POST(request: NextRequest) {
   return apiOk(updatedDiagnosis || { id: diagnosis.id, status: "PROCESSING" }, 200);
 }
 
-// GET /api/diagnoses — farmer sees own diagnoses
-export async function GET(request: NextRequest) {
-  const user = await getRequestUser(request);
-  if (!user) return apiError("UNAUTHORIZED", 401);
-
+async function legacyListDiagnoses(request: NextRequest, user: any) {
   const { searchParams } = request.nextUrl;
   const page = Math.max(1, Number(searchParams.get("page") ?? 1));
   const limit = 10;
@@ -209,4 +282,26 @@ export async function GET(request: NextRequest) {
   ]);
 
   return apiOk({ data: diagnoses, total, page, limit });
+}
+
+// ─── Main Route Handlers ──────────────────────────────────────────────────────
+
+export async function POST(request: NextRequest) {
+  const user = await getRequestUser(request);
+  if (!user) return apiError("UNAUTHORIZED", 401);
+
+  if (USE_MICROSERVICE) {
+    return proxyCreateDiagnosis(request, user);
+  }
+  return legacyCreateDiagnosis(request, user);
+}
+
+export async function GET(request: NextRequest) {
+  const user = await getRequestUser(request);
+  if (!user) return apiError("UNAUTHORIZED", 401);
+
+  if (USE_MICROSERVICE) {
+    return proxyListDiagnoses(request, user);
+  }
+  return legacyListDiagnoses(request, user);
 }
