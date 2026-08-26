@@ -28,22 +28,21 @@ export async function POST(request: NextRequest) {
     }
 
     const testOtp = "123456";
-    const service = new ZaloOtpService();
+    const service = new ZaloOtpService(undefined, true);
 
     // recipientId dùng cho OA Message fallback — để trống vì đây chỉ là test ZNS
     const success = await service.sendOtp("", testOtp, cleanPhone);
 
     if (!success) {
       return apiError(
-        "Gửi OTP test thất bại. Zalo token có thể đã hết hạn hoặc ZNS template chưa được cấu hình.",
+        "Gửi OTP test thất bại. Zalo token có thể đã hết hạn, sai ZNS template ID hoặc tài khoản OA chưa đủ số dư/quyền gửi.",
         502
       );
     }
 
     return apiOk({
       success: true,
-      message: `Đã gửi OTP test (${testOtp}) tới ${cleanPhone} qua Zalo ZNS thành công!`,
-      note: process.env.NODE_ENV !== "production" ? "⚠️ Môi trường dev: OTP không gửi thật, luôn trả về thành công." : undefined,
+      message: `Đã kết nối Zalo API và gửi OTP test (${testOtp}) tới ${cleanPhone} thành công!`,
     });
   } catch (error: any) {
     return apiError(error?.message || "Lỗi khi gửi OTP test", 500);

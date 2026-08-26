@@ -3,13 +3,15 @@ import { ZaloTokenManager } from '../zalo/ZaloTokenManager';
 
 export class ZaloOtpService implements IOtpService {
   private accessToken?: string;
+  private forceRealSend: boolean;
 
-  constructor(accessToken?: string) {
+  constructor(accessToken?: string, forceRealSend: boolean = false) {
     this.accessToken = accessToken;
+    this.forceRealSend = forceRealSend;
   }
 
   async sendOtp(recipientId: string, otp: string, phone: string): Promise<boolean> {
-    if (process.env.NODE_ENV !== 'production') {
+    if (process.env.NODE_ENV !== 'production' && !this.forceRealSend) {
       console.log(`[DEV] Zalo OTP for ${phone}: ${otp}`);
       return true;
     }

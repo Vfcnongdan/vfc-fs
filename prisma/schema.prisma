@@ -484,6 +484,7 @@ model ZaloAuthToken {
   expiresAt             DateTime  @map("expires_at")
   refreshTokenExpiresAt DateTime? @map("refresh_token_expires_at")
   enabled               Boolean   @default(true) @map("enabled")
+  refreshThresholdSeconds Int     @default(14400) @map("refresh_threshold_seconds")
   createdAt             DateTime  @default(now()) @map("created_at")
   updatedAt             DateTime  @updatedAt @map("updated_at")
 

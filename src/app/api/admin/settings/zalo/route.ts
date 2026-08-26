@@ -105,7 +105,7 @@ export async function PUT(request: NextRequest) {
 
 /**
  * PATCH /api/admin/settings/zalo
- * Bật hoặc Tắt trạng thái chứng thực Zalo
+ * Cập nhật cấu hình chứng thực Zalo (bật/tắt hoặc cập nhật ngưỡng tự động làm mới)
  */
 export async function PATCH(request: NextRequest) {
   const user = await getRequestUser(request);
@@ -115,22 +115,40 @@ export async function PATCH(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { enabled } = body;
+    const { enabled, refreshThresholdSeconds } = body;
 
-    if (typeof enabled !== "boolean") {
-      return apiError("Tham số 'enabled' phải là giá trị boolean", 400);
+    let updatedEnabled: boolean | undefined;
+    let updatedThreshold: number | undefined;
+
+    if (typeof enabled === "boolean") {
+      updatedEnabled = await ZaloTokenManager.getInstance().setAuthEnabled(enabled);
     }
 
-    const updatedEnabled = await ZaloTokenManager.getInstance().setAuthEnabled(enabled);
+    if (refreshThresholdSeconds !== undefined) {
+      const thresholdNum = Number(refreshThresholdSeconds);
+      if (isNaN(thresholdNum) || thresholdNum < 60 || thresholdNum > 86400) {
+        return apiError(
+          "Ngưỡng tự động làm mới phải là số nguyên từ 60 giây (1 phút) đến 86.400 giây (24 giờ).",
+          400
+        );
+      }
+      updatedThreshold = await ZaloTokenManager.getInstance().setRefreshThreshold(thresholdNum);
+    }
+
+    if (updatedEnabled === undefined && updatedThreshold === undefined) {
+      return apiError("Vui lòng cung cấp 'enabled' hoặc 'refreshThresholdSeconds' để cập nhật", 400);
+    }
+
+    const currentStatus = await ZaloTokenManager.getInstance().getTokenStatus();
 
     return apiOk({
       success: true,
-      message: updatedEnabled
-        ? "Đã BẬT chứng thực Zalo thành công."
-        : "Đã TẮT chứng thực Zalo thành công.",
-      enabled: updatedEnabled,
+      message: "Cập nhật cấu hình Zalo thành công.",
+      enabled: updatedEnabled ?? currentStatus.enabled,
+      refreshThresholdSeconds: updatedThreshold ?? currentStatus.refreshThresholdSeconds,
+      status: currentStatus,
     });
   } catch (error: any) {
-    return apiError(error?.message || "Không thể cập nhật trạng thái chứng thực Zalo", 400);
+    return apiError(error?.message || "Không thể cập nhật cấu hình Zalo", 400);
   }
 }

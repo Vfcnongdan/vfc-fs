@@ -12,6 +12,33 @@ interface ZaloStatus {
   isExpiringSoon?: boolean;
   refreshTokenAlertLevel?: "ok" | "warning" | "critical" | "expired" | "unknown";
   refreshTokenDaysLeft?: number | null;
+  refreshThresholdSeconds: number;
+  autoRefreshScheduledAt: string | null;
+  timeUntilAutoRefreshSeconds: number | null;
+}
+
+const PRESET_THRESHOLDS = [
+  { label: "1 phút (Test)", seconds: 60 },
+  { label: "1 giờ", seconds: 3600 },
+  { label: "2 giờ", seconds: 7200 },
+  { label: "4 giờ (Khuyên dùng)", seconds: 14400 },
+  { label: "8 giờ", seconds: 28800 },
+  { label: "12 giờ", seconds: 43200 },
+  { label: "24 giờ (86.400s)", seconds: 86400 },
+];
+
+function formatSecondsToHumanReadable(seconds: number): string {
+  if (isNaN(seconds) || seconds <= 0) return "0 giây";
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+
+  const parts: string[] = [];
+  if (hours > 0) parts.push(`${hours} giờ`);
+  if (minutes > 0) parts.push(`${minutes} phút`);
+  if (secs > 0 || parts.length === 0) parts.push(`${secs} giây`);
+
+  return parts.join(" ");
 }
 
 export default function AdminSettingsPage() {
@@ -22,6 +49,9 @@ export default function AdminSettingsPage() {
   const [refreshTokenInput, setRefreshTokenInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [toggling, setToggling] = useState(false);
+  const [refreshingToken, setRefreshingToken] = useState(false);
+  const [thresholdInput, setThresholdInput] = useState<string>("14400");
+  const [savingThreshold, setSavingThreshold] = useState(false);
   const [testPhone, setTestPhone] = useState("");
   const [testingOtp, setTestingOtp] = useState(false);
   const [testOtpResult, setTestOtpResult] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -35,10 +65,13 @@ export default function AdminSettingsPage() {
       const data = await res.json();
       if (res.ok && data.success) {
         setStatus(data.status);
+        if (data.status?.refreshThresholdSeconds) {
+          setThresholdInput(String(data.status.refreshThresholdSeconds));
+        }
       } else {
         setMessage({ type: "error", text: data.error || "Không thể tải trạng thái Zalo token" });
       }
-    } catch (err) {
+    } catch {
       setMessage({ type: "error", text: "Lỗi kết nối khi tải cấu hình Zalo" });
     } finally {
       setLoading(false);
@@ -81,7 +114,7 @@ export default function AdminSettingsPage() {
       } else {
         setMessage({ type: "error", text: data.error || data.message || "Lưu token thất bại" });
       }
-    } catch (err) {
+    } catch {
       setMessage({ type: "error", text: "Lỗi kết nối tới máy chủ khi lưu token" });
     } finally {
       setSubmitting(false);
@@ -105,10 +138,83 @@ export default function AdminSettingsPage() {
       } else {
         setMessage({ type: "error", text: data.error || "Không thể đổi trạng thái chứng thực Zalo" });
       }
-    } catch (err) {
+    } catch {
       setMessage({ type: "error", text: "Lỗi kết nối khi cập nhật trạng thái Zalo" });
     } finally {
       setToggling(false);
+    }
+  };
+
+  const handleForceRefresh = async () => {
+    try {
+      setRefreshingToken(true);
+      setMessage(null);
+      const res = await fetch("/api/admin/settings/zalo/refresh", {
+        method: "POST",
+      });
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        setMessage({
+          type: "success",
+          text: data.message || "Làm mới Zalo Access Token và Refresh Token thành công!",
+        });
+        if (data.status) {
+          setStatus(data.status);
+        } else {
+          await fetchStatus();
+        }
+      } else {
+        setMessage({
+          type: "error",
+          text: data.error || data.message || "Làm mới token thất bại. Vui lòng kiểm tra lại Refresh Token.",
+        });
+      }
+    } catch {
+      setMessage({ type: "error", text: "Lỗi kết nối tới máy chủ khi làm mới token" });
+    } finally {
+      setRefreshingToken(false);
+    }
+  };
+
+  const handleSaveThreshold = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const parsed = parseInt(thresholdInput, 10);
+    if (isNaN(parsed) || parsed < 60 || parsed > 86400) {
+      setMessage({
+        type: "error",
+        text: "Ngưỡng thời gian phải là số nguyên từ 60 giây (1 phút) đến 86.400 giây (24 giờ).",
+      });
+      return;
+    }
+
+    try {
+      setSavingThreshold(true);
+      setMessage(null);
+      const res = await fetch("/api/admin/settings/zalo", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refreshThresholdSeconds: parsed }),
+      });
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        setMessage({
+          type: "success",
+          text: `Đã lưu cấu hình ngưỡng tự động làm mới: ${parsed} giây (${formatSecondsToHumanReadable(parsed)})`,
+        });
+        if (data.status) {
+          setStatus(data.status);
+        } else {
+          await fetchStatus();
+        }
+      } else {
+        setMessage({ type: "error", text: data.error || "Không thể lưu cấu hình ngưỡng" });
+      }
+    } catch {
+      setMessage({ type: "error", text: "Lỗi kết nối khi lưu cấu hình ngưỡng" });
+    } finally {
+      setSavingThreshold(false);
     }
   };
 
@@ -139,6 +245,7 @@ export default function AdminSettingsPage() {
     }
   };
 
+  const currentThresholdNum = parseInt(thresholdInput, 10);
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 pb-12">
@@ -150,7 +257,7 @@ export default function AdminSettingsPage() {
             Cài đặt Hệ thống
           </h1>
           <p className="mt-1 text-sm text-neutral-500 font-medium">
-            Quản lý cấu hình tích hợp Zalo, thông báo và các thiết lập toàn hệ thống.
+            Quản lý cấu hình tích hợp Zalo, cơ chế tự động làm mới token và các thiết lập toàn hệ thống.
           </p>
         </div>
       </div>
@@ -206,7 +313,7 @@ export default function AdminSettingsPage() {
         <div className="space-y-6">
           {/* Main Card */}
           <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-neutral-200 space-y-8">
-            {/* Top Bar: Title & Toggle */}
+            {/* Top Bar: Title & Toggle & Quick Refresh */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 pb-6 border-b border-neutral-100">
               <div className="space-y-1">
                 <div className="flex items-center gap-3">
@@ -232,28 +339,50 @@ export default function AdminSettingsPage() {
                   )}
                 </div>
                 <p className="text-xs text-neutral-500">
-                  Tự động cấp và refresh Zalo Access Token / Refresh Token để gửi OTP ZNS và tin nhắn OA.
+                  Tự động cấp và làm mới Zalo Access Token / Refresh Token thông minh để gửi OTP ZNS và tin nhắn OA.
                 </p>
               </div>
 
-              {/* Toggle Enable Button */}
+              {/* Actions: Refresh Now & Toggle Enable */}
               {status?.configured && (
-                <div className="flex items-center gap-3 bg-neutral-50 p-2 rounded-2xl border border-neutral-200 self-start sm:self-auto">
-                  <span className="text-xs font-bold text-neutral-700 pl-2">Chứng thực Zalo:</span>
+                <div className="flex flex-wrap items-center gap-3">
                   <button
                     type="button"
-                    disabled={toggling}
-                    onClick={() => handleToggleEnable(!status.enabled)}
-                    className={`relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                      status.enabled ? "bg-[#064E3B]" : "bg-neutral-300"
-                    }`}
+                    disabled={refreshingToken}
+                    onClick={handleForceRefresh}
+                    className="flex items-center gap-2 px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-xl shadow-sm transition disabled:opacity-50"
+                    title="Dùng Refresh Token hiện tại để lấy cặp Access Token + Refresh Token mới ngay lập tức"
                   >
-                    <span
-                      className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                        status.enabled ? "translate-x-7" : "translate-x-0"
-                      }`}
-                    />
+                    {refreshingToken ? (
+                      <>
+                        <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <span>Đang làm mới...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>🔄</span>
+                        <span>Làm mới Token ngay</span>
+                      </>
+                    )}
                   </button>
+
+                  <div className="flex items-center gap-3 bg-neutral-50 p-2 rounded-2xl border border-neutral-200">
+                    <span className="text-xs font-bold text-neutral-700 pl-2">Chứng thực Zalo:</span>
+                    <button
+                      type="button"
+                      disabled={toggling}
+                      onClick={() => handleToggleEnable(!status.enabled)}
+                      className={`relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        status.enabled ? "bg-[#064E3B]" : "bg-neutral-300"
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                          status.enabled ? "translate-x-7" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -261,27 +390,57 @@ export default function AdminSettingsPage() {
             {/* Current Token Status Dashboard */}
             {status?.configured && (
               <div className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Card 1: Token Expiration */}
                   <div className="p-4 bg-neutral-50 rounded-2xl border border-neutral-200">
-                    <span className="text-xs text-neutral-500 font-bold uppercase tracking-wider">Hạn dùng Token</span>
+                    <span className="text-xs text-neutral-500 font-bold uppercase tracking-wider">Hạn dùng Access Token</span>
                     <div className="mt-1 text-sm font-extrabold text-neutral-900">
                       {status.expiresAt ? new Date(status.expiresAt).toLocaleString("vi-VN") : "N/A"}
                     </div>
-                    {status.isExpiringSoon && (
-                      <span className="text-[11px] font-bold text-amber-600 mt-1 block">⚠️ Sắp hết hạn (sẽ tự động refresh)</span>
+                    {status.isExpiringSoon ? (
+                      <span className="text-[11px] font-bold text-amber-600 mt-1 block">
+                        ⚠️ Đã chạm ngưỡng làm mới
+                      </span>
+                    ) : (
+                      <span className="text-[11px] font-bold text-emerald-600 mt-1 block">
+                        ✓ Đang còn hiệu lực
+                      </span>
                     )}
                   </div>
+
+                  {/* Card 2: Auto-refresh threshold */}
+                  <div className="p-4 bg-neutral-50 rounded-2xl border border-neutral-200">
+                    <span className="text-xs text-neutral-500 font-bold uppercase tracking-wider">Ngưỡng tự động làm mới</span>
+                    <div className="mt-1 text-sm font-extrabold text-[#064E3B]">
+                      {status.refreshThresholdSeconds}s ({formatSecondsToHumanReadable(status.refreshThresholdSeconds)})
+                    </div>
+                    <span className="text-[11px] text-neutral-500 mt-1 block truncate">
+                      {status.autoRefreshScheduledAt
+                        ? `Làm mới từ: ${new Date(status.autoRefreshScheduledAt).toLocaleTimeString("vi-VN")}`
+                        : "Chưa lên lịch"}
+                    </span>
+                  </div>
+
+                  {/* Card 3: Masked Access Token */}
                   <div className="p-4 bg-neutral-50 rounded-2xl border border-neutral-200">
                     <span className="text-xs text-neutral-500 font-bold uppercase tracking-wider">Access Token (DB)</span>
                     <div className="mt-1 text-xs font-mono font-bold text-neutral-700 truncate">
                       {status.accessTokenMasked || "Chưa có"}
                     </div>
+                    <span className="text-[11px] text-neutral-400 mt-1 block">Hạn dùng ~25 giờ</span>
                   </div>
+
+                  {/* Card 4: Masked Refresh Token */}
                   <div className="p-4 bg-neutral-50 rounded-2xl border border-neutral-200">
                     <span className="text-xs text-neutral-500 font-bold uppercase tracking-wider">Refresh Token (DB)</span>
                     <div className="mt-1 text-xs font-mono font-bold text-neutral-700 truncate">
                       {status.refreshTokenMasked || "Chưa có"}
                     </div>
+                    <span className="text-[11px] text-neutral-400 mt-1 block">
+                      {status.refreshTokenDaysLeft !== null
+                        ? `Còn ~${status.refreshTokenDaysLeft} ngày (hạn 90 ngày)`
+                        : "Hạn 90 ngày"}
+                    </span>
                   </div>
                 </div>
 
@@ -295,7 +454,7 @@ export default function AdminSettingsPage() {
                       bg: "bg-red-50 border-red-300",
                       icon: "⛔",
                       title: "Refresh Token Zalo đã hết hạn!",
-                      body: "Hệ thống sẽ không thể tự động renew Access Token. Vui lòng nhập lại token mới ngay.",
+                      body: "Hệ thống không thể tự động làm mới Access Token. Vui lòng nhập lại cặp token mới từ Zalo Developer Console.",
                       textColor: "text-red-900",
                       subColor: "text-red-700",
                     },
@@ -303,7 +462,7 @@ export default function AdminSettingsPage() {
                       bg: "bg-red-50 border-red-200",
                       icon: "🔴",
                       title: `Refresh Token sắp hết hạn trong ${days} ngày!`,
-                      body: "Hãy chuẩn bị cập nhật lại token sớm. Nếu cron job ngưng chạy, token có thể expire mà không ai biết.",
+                      body: "Hãy bấm 'Làm mới Token ngay' để Zalo cấp lại Refresh Token 90 ngày mới.",
                       textColor: "text-red-900",
                       subColor: "text-red-700",
                     },
@@ -311,7 +470,7 @@ export default function AdminSettingsPage() {
                       bg: "bg-amber-50 border-amber-200",
                       icon: "🟡",
                       title: `Refresh Token còn ${days} ngày`,
-                      body: "Hãy theo dõi. Nếu cron job chạy ổn định, token sẽ tự động renew trước khi hết hạn.",
+                      body: "Khi hệ thống tự động làm mới Access Token, Refresh Token cũng sẽ được xoay vòng gia hạn thêm 90 ngày.",
                       textColor: "text-amber-900",
                       subColor: "text-amber-700",
                     },
@@ -319,7 +478,7 @@ export default function AdminSettingsPage() {
                       bg: "bg-neutral-50 border-neutral-200",
                       icon: "❓",
                       title: "Chưa xác định hạn Refresh Token",
-                      body: "Token này được lưu trước khi hệ thống tracking được cập nhật. Vui lòng nhập lại token để khởi động bộ đếm chính xác.",
+                      body: "Bấm 'Làm mới Token ngay' để hệ thống đồng bộ lại hạn dùng 90 ngày.",
                       textColor: "text-neutral-900",
                       subColor: "text-neutral-600",
                     },
@@ -344,15 +503,94 @@ export default function AdminSettingsPage() {
               </div>
             )}
 
+            {/* Section: Cấu hình Ngưỡng Tự động Làm mới (Refresh Threshold) */}
+            <div className="bg-emerald-50/50 p-6 rounded-2xl border border-emerald-200 space-y-4">
+              <div>
+                <h3 className="text-base font-bold text-neutral-900 flex items-center gap-2">
+                  <span>⏱️</span>
+                  <span>Cấu hình Ngưỡng Tự động Làm mới Token</span>
+                </h3>
+                <p className="text-xs text-neutral-600 mt-1">
+                  Quy định khoảng thời gian còn lại tối thiểu của Access Token trước khi hệ thống tự động gửi yêu cầu đổi token mới với Zalo (từ <code className="bg-white px-1.5 py-0.5 rounded border border-emerald-200 font-bold text-emerald-800">60s (1 phút)</code> đến <code className="bg-white px-1.5 py-0.5 rounded border border-emerald-200 font-bold text-emerald-800">86.400s (24 giờ)</code>).
+                </p>
+              </div>
+
+              {/* Preset buttons */}
+              <div className="space-y-1.5">
+                <span className="text-xs font-bold text-neutral-600">Chọn nhanh mốc thời gian:</span>
+                <div className="flex flex-wrap gap-2">
+                  {PRESET_THRESHOLDS.map((preset) => (
+                    <button
+                      key={preset.seconds}
+                      type="button"
+                      onClick={() => setThresholdInput(String(preset.seconds))}
+                      className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition ${
+                        thresholdInput === String(preset.seconds)
+                          ? "bg-[#064E3B] text-white border-[#064E3B] shadow-sm"
+                          : "bg-white text-neutral-700 border-neutral-300 hover:bg-neutral-100"
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <form onSubmit={handleSaveThreshold} className="space-y-3 pt-2">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                  <div className="relative flex-1">
+                    <input
+                      id="thresholdSeconds"
+                      type="number"
+                      min={60}
+                      max={86400}
+                      value={thresholdInput}
+                      onChange={(e) => setThresholdInput(e.target.value)}
+                      placeholder="Nhập số giây (60 - 86400)"
+                      className="w-full px-4 py-2.5 bg-white border border-emerald-300 rounded-xl text-sm font-mono focus:ring-2 focus:ring-[#064E3B] focus:border-[#064E3B] outline-none transition"
+                    />
+                    <span className="absolute right-4 top-2.5 text-xs font-bold text-neutral-400">
+                      giây
+                    </span>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={savingThreshold}
+                    className="flex items-center justify-center gap-2 px-6 py-2.5 bg-[#064E3B] text-white text-sm font-bold rounded-xl hover:bg-[#064E3B]/90 focus:ring-4 focus:ring-[#064E3B]/20 transition disabled:opacity-50 shadow-sm whitespace-nowrap"
+                  >
+                    {savingThreshold ? (
+                      <>
+                        <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <span>Đang lưu...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>💾</span>
+                        <span>Áp dụng Ngưỡng</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {!isNaN(currentThresholdNum) && currentThresholdNum >= 60 && currentThresholdNum <= 86400 && (
+                  <p className="text-xs text-emerald-800 font-medium bg-emerald-100/60 p-2.5 rounded-xl border border-emerald-200/80">
+                    💡 <strong>Ý nghĩa:</strong> Bất kỳ khi nào có yêu cầu gửi OTP hoặc đăng nhập, nếu Access Token còn lại dưới{" "}
+                    <strong>{formatSecondsToHumanReadable(currentThresholdNum)}</strong>, hệ thống sẽ tự động dùng Refresh Token để cấp lại cặp token mới kéo dài thêm 25h và xoay vòng 90 ngày.
+                  </p>
+                )}
+              </form>
+            </div>
+
             {/* Direct Token Input Form */}
             <div className="bg-neutral-50/70 p-6 rounded-2xl border border-neutral-200 space-y-4">
               <div>
                 <h3 className="text-base font-bold text-neutral-900 flex items-center gap-2">
                   <span>🔑</span>
-                  <span>Nhập Token trực tiếp</span>
+                  <span>Nhập Token trực tiếp từ Zalo Developer</span>
                 </h3>
                 <p className="text-xs text-neutral-500 mt-1">
-                  Nhập <code className="bg-white px-1.5 py-0.5 rounded border border-neutral-200 font-bold text-neutral-800">Access Token</code> và <code className="bg-white px-1.5 py-0.5 rounded border border-neutral-200 font-bold text-neutral-800">Refresh Token</code> lấy từ Zalo Developer Console để kích hoạt hoặc cập nhật chứng thực Zalo OA.
+                  Chỉ cần nhập <code className="bg-white px-1.5 py-0.5 rounded border border-neutral-200 font-bold text-neutral-800">Access Token</code> và <code className="bg-white px-1.5 py-0.5 rounded border border-neutral-200 font-bold text-neutral-800">Refresh Token</code> <strong>lần đầu tiên duy nhất</strong> lấy từ Zalo Developer Console. Sau khi lưu, hệ thống sẽ tự động làm mới mãi mãi.
                 </p>
               </div>
 
