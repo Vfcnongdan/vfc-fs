@@ -6,6 +6,11 @@ import { runAiDiagnosis } from "@/lib/aiDiagnosis";
 
 export const maxDuration = 90;
 
+const MICROSERVICE_URL =
+  process.env.DIAGNOSIS_SERVICE_URL || "http://localhost:3001";
+const USE_MICROSERVICE =
+  process.env.USE_DIAGNOSIS_MICROSERVICE === "true";
+
 function isAwaitingStagePayload(
   value: unknown
 ): value is {
@@ -22,14 +27,59 @@ function isAwaitingStagePayload(
   );
 }
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const user = await getRequestUser(request);
-  if (!user) return apiError("UNAUTHORIZED", 401);
+// ─── Microservice Proxy Handlers ─────────────────────────────────────────────
 
-  const { id } = await params;
+async function proxyGetDiagnosis(id: string, user: any) {
+  try {
+    const response = await fetch(`${MICROSERVICE_URL}/api/v1/diagnoses/${id}`, {
+      headers: {
+        "x-user-id": user.id,
+        "x-user-role": user.role,
+      },
+      signal: AbortSignal.timeout(60000),
+    });
+
+    const data = await response.json();
+    return apiOk(data, response.status);
+  } catch (err: any) {
+    console.error("[Proxy GET Diagnosis Detail Error]", err);
+    return apiError(
+      `Không thể kết nối đến dịch vụ chẩn đoán AI (${err.message}). Vui lòng thử lại sau.`,
+      502
+    );
+  }
+}
+
+async function proxyConfirmStage(request: NextRequest, id: string, user: any) {
+  const body = await request.json().catch(() => null);
+  if (!body?.growthStage) return apiError("MISSING_GROWTH_STAGE", 400);
+
+  try {
+    const response = await fetch(`${MICROSERVICE_URL}/api/v1/diagnoses/${id}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "x-user-id": user.id,
+        "x-user-role": user.role,
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(60000),
+    });
+
+    const data = await response.json();
+    return apiOk(data, response.status);
+  } catch (err: any) {
+    console.error("[Proxy PATCH Stage Error]", err);
+    return apiError(
+      `Không thể kết nối đến dịch vụ chẩn đoán AI (${err.message}). Vui lòng thử lại sau.`,
+      502
+    );
+  }
+}
+
+// ─── Legacy Monolith Handlers (Fallback) ──────────────────────────────────────
+
+async function legacyGetDiagnosis(id: string, user: any) {
   const diagnosis = await prisma.plantDiagnosis.findUnique({
     where: { id },
     include: {
@@ -51,20 +101,7 @@ export async function GET(
   return apiOk(diagnosis);
 }
 
-/**
- * PATCH /api/diagnoses/:id
- * body: { growthStage: string }
- * Trigger AI analysis sau khi user chọn giai đoạn thủ công.
- * Chỉ hợp lệ khi diagnosis đang ở trạng thái AWAITING_STAGE (rawAiResponse.awaitingStage = true).
- */
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const user = await getRequestUser(request);
-  if (!user) return apiError("UNAUTHORIZED", 401);
-
-  const { id } = await params;
+async function legacyConfirmStage(request: NextRequest, id: string, user: any) {
   const body = await request.json().catch(() => null);
   const growthStage = body?.growthStage as string | undefined;
 
@@ -77,14 +114,12 @@ export async function PATCH(
   if (!diagnosis) return apiError("NOT_FOUND", 404);
   if (diagnosis.userId !== user.id) return apiError("FORBIDDEN", 403);
 
-  // Kiểm tra trạng thái hợp lệ
   const awaitingPayload = diagnosis.rawAiResponse;
   if (!isAwaitingStagePayload(awaitingPayload)) {
     console.log(`[PATCH AI Diagnosis] INVALID_STATE | ID: ${id} | rawAiResponse: ${JSON.stringify(awaitingPayload)}`);
     return apiError("INVALID_STATE", 400);
   }
 
-  // Reset về PROCESSING để client poll
   await prisma.plantDiagnosis.update({
     where: { id },
     data: {
@@ -94,9 +129,6 @@ export async function PATCH(
   });
   console.log(`[PATCH AI Diagnosis] Start stage-confirmed diagnosis | ID: ${id} | Stage: ${growthStage}`);
 
-  // Lấy lại base64 images — không lưu ảnh nên cần client gửi lại?
-  // Không thể: ảnh không được lưu. Phải yêu cầu client re-upload.
-  // Giải pháp: client gửi base64 ảnh cùng với PATCH request.
   const base64Images = body?.base64Images as string[] | undefined;
   if (!base64Images?.length) {
     return apiError("MISSING_IMAGES", 400);
@@ -137,4 +169,36 @@ export async function PATCH(
   });
 
   return apiOk(updated || { id, status: "PROCESSING" });
+}
+
+// ─── Main Route Handlers ──────────────────────────────────────────────────────
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const user = await getRequestUser(request);
+  if (!user) return apiError("UNAUTHORIZED", 401);
+
+  const { id } = await params;
+
+  if (USE_MICROSERVICE) {
+    return proxyGetDiagnosis(id, user);
+  }
+  return legacyGetDiagnosis(id, user);
+}
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const user = await getRequestUser(request);
+  if (!user) return apiError("UNAUTHORIZED", 401);
+
+  const { id } = await params;
+
+  if (USE_MICROSERVICE) {
+    return proxyConfirmStage(request, id, user);
+  }
+  return legacyConfirmStage(request, id, user);
 }
