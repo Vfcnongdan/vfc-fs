@@ -7,6 +7,32 @@ import PageLoadingOverlay from "@/components/PageLoadingOverlay";
 
 type Step = "phone" | "otp";
 
+function getFriendlyErrorMessage(err: unknown, defaultMsg: string): string {
+  if (!err) return defaultMsg;
+  if (typeof err === "string") {
+    const map: Record<string, string> = {
+      INVALID_PHONE: "Số điện thoại không đúng định dạng di động Việt Nam",
+      PHONE_NOT_AUTHORIZED: "Số điện thoại này chưa được đăng ký trong hệ thống VFC",
+      OTP_SEND_FAILED: "Không thể gửi mã OTP lúc này. Vui lòng thử lại sau",
+      RATE_LIMITED: "Bạn đã yêu cầu gửi mã quá nhiều lần. Vui lòng thử lại sau 15 phút",
+      COOLDOWN: "Vui lòng chờ ít giây trước khi yêu cầu gửi lại mã",
+      OTP_EXPIRED: "Mã OTP đã hết hạn. Vui lòng yêu cầu mã mới",
+      OTP_NOT_FOUND_OR_EXPIRED: "Mã OTP không tồn tại hoặc đã hết hạn",
+      MAX_ATTEMPTS_EXCEEDED: "Bạn đã nhập sai quá 5 lần. Vui lòng gửi lại mã mới",
+      INVALID_OTP: "Mã OTP không chính xác. Vui lòng kiểm tra lại",
+      INVALID_INPUT: "Thông tin nhập không hợp lệ",
+      UNAUTHORIZED: "Phiên đăng nhập không hợp lệ",
+      INTERNAL_SERVER_ERROR: "Có lỗi xảy ra ở máy chủ. Vui lòng thử lại sau",
+      INTERNAL_ERROR: "Có lỗi xảy ra ở máy chủ. Vui lòng thử lại sau",
+    };
+    return map[err] || err;
+  }
+  if (err instanceof Error) {
+    return getFriendlyErrorMessage(err.message, defaultMsg);
+  }
+  return defaultMsg;
+}
+
 function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -18,12 +44,22 @@ function LoginContent() {
   const [checkingSession, setCheckingSession] = useState(true);
   const [error, setError] = useState("");
   const [agreed, setAgreed] = useState(false);
+  const [countdown, setCountdown] = useState(0);
   const otpRefs = [
     useRef<HTMLInputElement>(null),
     useRef<HTMLInputElement>(null),
     useRef<HTMLInputElement>(null),
     useRef<HTMLInputElement>(null),
   ];
+
+  // Cooldown countdown timer for OTP resend
+  useEffect(() => {
+    if (countdown <= 0) return;
+    const timer = setInterval(() => {
+      setCountdown((prev) => prev - 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [countdown]);
 
   // Auto-redirect if already logged in + load last phone
   useEffect(() => {
@@ -44,12 +80,15 @@ function LoginContent() {
       if (lastPhone) setPhone(lastPhone);
     }
     checkSession();
-  }, [router]);
+  }, [router, redirectTo]);
 
   async function handleSendOtp(e?: React.FormEvent) {
     if (e) e.preventDefault();
     if (step === "phone" && !agreed) {
       setError("Bạn cần đồng ý với Điều khoản & Điều kiện");
+      return;
+    }
+    if (step === "otp" && countdown > 0) {
       return;
     }
     setError("");
@@ -61,12 +100,15 @@ function LoginContent() {
         body: JSON.stringify({ phone }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Gửi OTP thất bại");
+      if (!res.ok) {
+        throw new Error(data.message || getFriendlyErrorMessage(data.error, "Gửi OTP thất bại"));
+      }
       localStorage.setItem("lastPhone", phone);
       setStep("otp");
       setOtp(["", "", "", ""]);
+      setCountdown(60); // Khởi động 60s cooldown
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Có lỗi xảy ra");
+      setError(getFriendlyErrorMessage(err, "Có lỗi xảy ra khi gửi OTP"));
     } finally {
       setLoading(false);
     }
@@ -85,14 +127,16 @@ function LoginContent() {
         body: JSON.stringify({ phone, otp: fullOtp }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Xác thực OTP thất bại");
+      if (!res.ok) {
+        throw new Error(data.message || getFriendlyErrorMessage(data.error, "Xác thực OTP thất bại"));
+      }
 
       console.log("Login success, role:", data.user?.role);
       
       router.refresh();
       router.push(redirectTo);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Có lỗi xảy ra");
+      setError(getFriendlyErrorMessage(err, "Có lỗi xảy ra khi xác thực OTP"));
       setOtp(["", "", "", ""]);
       otpRefs[0].current?.focus();
     } finally {
@@ -163,6 +207,7 @@ function LoginContent() {
               onClick={() => {
                 setStep("phone");
                 setOtp(["", "", "", ""]);
+                setError("");
               }}
               className="text-white text-lg font-bold py-2"
             >
@@ -275,10 +320,12 @@ function LoginContent() {
             </div>
 
             <button
+              type="button"
+              disabled={loading || countdown > 0}
               onClick={() => handleSendOtp()}
-              className="text-white font-bold underline underline-offset-4 mb-16 decoration-2"
+              className="text-white font-bold underline underline-offset-4 mb-16 decoration-2 disabled:opacity-50 disabled:no-underline disabled:cursor-not-allowed transition"
             >
-              Gửi lại mã OTP
+              {countdown > 0 ? `Gửi lại mã OTP sau (${countdown}s)` : "Gửi lại mã OTP"}
             </button>
 
             <p className="text-white text-sm font-bold text-center px-6">

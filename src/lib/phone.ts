@@ -2,7 +2,8 @@
 const VN_MOBILE_CORE = /^([3-9]\d{8})$/;
 
 export function extractPhoneCore(phone: string): string | null {
-  const normalized = phone.trim().replace(/[\s-]/g, "");
+  if (!phone || typeof phone !== "string") return null;
+  const normalized = phone.replace(/[^\d+]/g, "").trim();
   const withoutPrefix = normalized.replace(/^(?:\+?84|0)/, "");
   const match = VN_MOBILE_CORE.exec(withoutPrefix);
   return match ? match[1] : null;

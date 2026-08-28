@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { createOtpRecord } from "@/lib/otp";
+import { createOtpRecord, checkOtpRateLimit } from "@/lib/otp";
 import { isPhoneAuthorizedForOtp } from "@/lib/otpAuth";
 import { getPhoneVariants, isValidVietnamesePhone } from "@/lib/phone";
 import { OtpController } from "@/controllers/OtpController";
@@ -9,8 +9,8 @@ import { OtpServiceFactory } from "@/services/otp/OtpServiceFactory";
 const schema = z.object({
   phone: z
     .string()
-    .min(1)
-    .refine(isValidVietnamesePhone, "Số điện thoại không hợp lệ"),
+    .min(1, "Vui lòng nhập số điện thoại")
+    .refine(isValidVietnamesePhone, "Số điện thoại không đúng định dạng di động Việt Nam"),
   chatId: z.string().optional(),
   provider: z.enum(["telegram", "zalo", "all"]).optional(), // Hỗ trợ chỉ định "telegram", "zalo" hoặc "all" (gửi cả 2)
 });
@@ -20,8 +20,9 @@ export async function POST(request: NextRequest) {
   const parsed = schema.safeParse(body);
 
   if (!parsed.success) {
+    const errorMsg = parsed.error.issues[0]?.message || "Số điện thoại không hợp lệ";
     return Response.json(
-      { error: "INVALID_PHONE", details: parsed.error.flatten() },
+      { error: "INVALID_PHONE", message: errorMsg, details: parsed.error.flatten() },
       { status: 400 }
     );
   }
@@ -36,7 +37,7 @@ export async function POST(request: NextRequest) {
       return Response.json(
         {
           error: "PHONE_NOT_AUTHORIZED",
-          message: "Số điện thoại không được phép truy cập hệ thống",
+          message: "Số điện thoại này chưa được đăng ký trong hệ thống VFC",
         },
         { status: 403 }
       );
@@ -51,7 +52,25 @@ export async function POST(request: NextRequest) {
     if (isDevBypass) {
       await createOtpRecord(phone, "1111");
       console.log(`[DEV BYPASS] OTP for ${phone}: 1111`);
-      return Response.json({ success: true, message: "OTP đã được gửi" });
+      return Response.json({ success: true, message: "Mã OTP thử nghiệm đã được kích hoạt" });
+    }
+
+    // Kiểm tra Rate Limit & Cooldown (60s giữa 2 lần gửi, tối đa 5 lần / 15 phút)
+    const rateLimitCheck = await checkOtpRateLimit(phone);
+    if (!rateLimitCheck.allowed) {
+      return Response.json(
+        {
+          error: rateLimitCheck.reason,
+          message: rateLimitCheck.message,
+          retryAfter: rateLimitCheck.retryAfter,
+        },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(rateLimitCheck.retryAfter || 60),
+          },
+        }
+      );
     }
 
     const otp = await createOtpRecord(phone);
@@ -76,7 +95,7 @@ export async function POST(request: NextRequest) {
 
     if (!sentSuccess) {
       return Response.json(
-        { error: "OTP_SEND_FAILED", message: "Gửi OTP thất bại" },
+        { error: "OTP_SEND_FAILED", message: "Gửi OTP qua Zalo/Telegram thất bại. Vui lòng thử lại" },
         { status: 500 }
       );
     }
@@ -91,6 +110,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (err) {
     console.error("[OTP Send Error]", err);
-    return Response.json({ error: "INTERNAL_ERROR" }, { status: 500 });
+    return Response.json({ error: "INTERNAL_ERROR", message: "Có lỗi xảy ra ở máy chủ. Vui lòng thử lại sau" }, { status: 500 });
   }
 }

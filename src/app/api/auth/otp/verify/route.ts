@@ -22,14 +22,17 @@ export async function POST(request: NextRequest) {
     const parsed = schema.safeParse(body);
 
     if (!parsed.success) {
-      return Response.json({ error: "INVALID_INPUT" }, { status: 400 });
+      return Response.json({ error: "INVALID_INPUT", message: "Thông tin nhập không hợp lệ" }, { status: 400 });
     }
 
     const { phone, otp } = parsed.data;
     const result = await verifyOtp(phone, otp);
 
     if (!result.valid) {
-      return Response.json({ error: result.reason }, { status: 401 });
+      return Response.json(
+        { error: result.reason, message: result.message || "Xác thực OTP thất bại" },
+        { status: 401 }
+      );
     }
 
     const sessionToken = crypto.randomUUID();
