@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import PageLoadingOverlay from "@/components/PageLoadingOverlay";
 import { requestOtp, verifyOtp, getMe } from "@/lib/auth-client";
+import { useAuthSSE } from "@/hooks/useAuthSSE";
+import { OtpToast } from "@/components/OtpToast";
 
 type Step = "phone" | "otp";
 
@@ -54,6 +56,9 @@ function LoginContent() {
     useRef<HTMLInputElement>(null),
   ];
 
+  // SSE real-time connection
+  const { connectionId, otpEvent, resetOtpEvent } = useAuthSSE(phone);
+
   // Cooldown countdown timer for OTP resend
   useEffect(() => {
     if (countdown <= 0) return;
@@ -84,6 +89,21 @@ function LoginContent() {
     checkSession();
   }, [router, redirectTo]);
 
+  // Tự động điền và kích hoạt xác thực khi nhận được OTP qua SSE
+  useEffect(() => {
+    if (otpEvent?.otp && otpEvent.otp.length === 4) {
+      const digits = otpEvent.otp.split("");
+      setOtp(digits);
+      setStep("otp");
+      setError("");
+
+      const timer = setTimeout(() => {
+        handleVerifyOtp(digits);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [otpEvent]);
+
   async function handleSendOtp(e?: React.FormEvent) {
     if (e) e.preventDefault();
     if (step === "phone" && !agreed) {
@@ -96,7 +116,7 @@ function LoginContent() {
     setError("");
     setLoading(true);
     try {
-      const res = await requestOtp(phone);
+      const res = await requestOtp(phone, connectionId || undefined);
       if (!res.success) {
         throw new Error(res.message || getFriendlyErrorMessage(res.error, "Gửi OTP thất bại"));
       }
@@ -181,6 +201,20 @@ function LoginContent() {
 
   return (
     <main className="relative min-h-screen flex flex-col items-center px-8 pt-6 bg-[#0C4A3F] overflow-hidden font-sans">
+      {/* Toast Notification khi nhận OTP qua SSE */}
+      {otpEvent && (
+        <OtpToast
+          otp={otpEvent.otp}
+          type={otpEvent.type}
+          onAutofill={() => {
+            const digits = otpEvent.otp.split("");
+            setOtp(digits);
+            handleVerifyOtp(digits);
+          }}
+          onClose={resetOtpEvent}
+        />
+      )}
+
       {checkingSession && <PageLoadingOverlay message="Đang đăng nhập..." />}
       {/* Background */}
       <div className="absolute inset-0 z-0">
