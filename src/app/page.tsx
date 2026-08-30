@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import PageLoadingOverlay from "@/components/PageLoadingOverlay";
+import { requestOtp, verifyOtp, getMe } from "@/lib/auth-client";
 
 type Step = "phone" | "otp";
 
@@ -39,6 +40,7 @@ function LoginContent() {
   const redirectTo = searchParams.get("from") || "/farmer";
   const [step, setStep] = useState<Step>("phone");
   const [phone, setPhone] = useState("");
+  const [challengeId, setChallengeId] = useState("");
   const [otp, setOtp] = useState(["", "", "", ""]);
   const [loading, setLoading] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
@@ -65,8 +67,8 @@ function LoginContent() {
   useEffect(() => {
     async function checkSession() {
       try {
-        const res = await fetch("/api/auth/me");
-        if (res.ok) {
+        const res = await getMe();
+        if (res.success) {
           router.push(redirectTo);
           router.refresh();
           return;
@@ -94,19 +96,16 @@ function LoginContent() {
     setError("");
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/otp/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.message || getFriendlyErrorMessage(data.error, "Gửi OTP thất bại"));
+      const res = await requestOtp(phone);
+      if (!res.success) {
+        throw new Error(res.message || getFriendlyErrorMessage(res.error, "Gửi OTP thất bại"));
       }
-      localStorage.setItem("lastPhone", phone);
+      if (res.challengeId) {
+        setChallengeId(res.challengeId);
+      }
       setStep("otp");
       setOtp(["", "", "", ""]);
-      setCountdown(60); // Khởi động 60s cooldown
+      setCountdown(res.retryAfter || 60); // Khởi động cooldown
     } catch (err: unknown) {
       setError(getFriendlyErrorMessage(err, "Có lỗi xảy ra khi gửi OTP"));
     } finally {
@@ -121,17 +120,12 @@ function LoginContent() {
     setError("");
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/otp/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, otp: fullOtp }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.message || getFriendlyErrorMessage(data.error, "Xác thực OTP thất bại"));
+      const res = await verifyOtp(challengeId || phone, fullOtp, phone);
+      if (!res.success) {
+        throw new Error(res.message || getFriendlyErrorMessage(res.error, "Xác thực OTP thất bại"));
       }
 
-      console.log("Login success, role:", data.user?.role);
+      console.log("Login success, user:", res.user);
       
       router.refresh();
       router.push(redirectTo);

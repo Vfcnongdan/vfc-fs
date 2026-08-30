@@ -6,6 +6,7 @@ import Image from "next/image";
 import { LogoutButton } from "@/components/LogoutButton";
 import { NotificationBell } from "@/components/NotificationBell";
 import { CartButton } from "@/components/CartButton";
+import { getMe } from "@/lib/auth-client";
 
 const NON_FARMER_ROLES = ["ADMIN", "SALE", "AGENCY", "SUPER_AGENT", "MDO", "SE", "BGD", "MDM", "CV_CM", "ASM", "TSM"];
 
@@ -13,14 +14,14 @@ export function FarmerHeader() {
   const [role, setRole] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/auth/me")
-      .then((r) => {
-        if (r.status === 401) {
+    getMe()
+      .then((res) => {
+        if (!res.success) {
           window.location.href = "/";
+          return;
         }
-        return r.json();
+        setRole(res.user?.role ?? "FARMER");
       })
-      .then((d) => setRole(d.user?.role ?? "FARMER"))
       .catch(() => {});
   }, []);
 
