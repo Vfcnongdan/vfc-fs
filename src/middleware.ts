@@ -26,8 +26,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Get token from cookie
-  const token = request.cookies.get(COOKIE_NAME)?.value;
+  // Get token from Authorization header first, fallback to cookie
+  const authHeader = request.headers.get("authorization");
+  const bearerToken = authHeader?.startsWith("Bearer ")
+    ? authHeader.slice(7).trim()
+    : null;
+  const token = bearerToken || request.cookies.get(COOKIE_NAME)?.value;
   const session = token ? await verifyToken(token) : null;
 
   console.log(`[Middleware] Path: ${pathname}, Token: ${!!token}, Session: ${!!session}`);
