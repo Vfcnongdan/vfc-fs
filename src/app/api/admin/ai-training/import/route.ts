@@ -31,6 +31,14 @@ function naturalKey(r: {
     .join("||");
 }
 
+function cleanSeverity(raw: string): string {
+  return (raw || "")
+    .trim()
+    .replace(/^\["?|"?\]$/g, "")
+    .replace(/^"|"$/g, "")
+    .trim();
+}
+
 function splitUrls(raw: string): string[] {
   // Xử lý mọi dạng serialization phổ biến:
   // - Postgres array: {"url1","url2"} hoặc {url1,url2}
@@ -38,10 +46,18 @@ function splitUrls(raw: string): string[] {
   // - Plain text:     url1\nurl2 hoặc url1,url2
   return (raw || "")
     .trim()
-    .replace(/^\{|\}$|^\[|\]$/g, '')   // strip {} hoặc []
+    .replace(/^\{|\}$|^\[|\]$/g, "")
     .split(/[\n,]+/)
-    .map((u) => u.trim().replace(/^"|"$/g, '').replace(/^'|'$/g, ''))
+    .map((u) => u.trim().replace(/^"|"$/g, "").replace(/^'|'$/g, ""))
     .filter(Boolean);
+}
+
+function normalizeStr(str: string): string {
+  return str
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "");
 }
 
 export async function POST(request: NextRequest) {
@@ -82,35 +98,96 @@ export async function POST(request: NextRequest) {
     return apiError("Tệp CSV không có dữ liệu", 400);
   }
 
-  let hasIdColumn = false;
-  if (records.length > 0) {
-    const headerRow = records[0].map(h => String(h).toLowerCase().trim());
-    if (headerRow[0] === "id") {
-      hasIdColumn = true;
-    }
-  }
+  // Phân tích Header row để tìm vị trí các cột
+  const headerRow = records[0].map((h) => normalizeStr(String(h)));
+  let mapCrop = -1;
+  let mapStage = -1;
+  let mapPest = -1;
+  let mapDetail = -1;
+  let mapSeverity = -1;
+  let mapImages = -1;
+  let mapDesc = -1;
+  let mapSolution = -1;
+  let mapThreshold = -1;
+  let mapDensity = -1;
+
+  headerRow.forEach((col, idx) => {
+    if (col === "croptype" || col === "crop" || col === "caytrong" || col === "tencay" || col === "loaicay") mapCrop = idx;
+    else if (col === "growthstage" || col === "stage" || col === "giaidoan" || col === "giaidoansinhtruong") mapStage = idx;
+    else if (col === "pestdisease" || col === "loaidichhai" || col === "dichhai" || col === "pest" || col === "disease") mapPest = idx;
+    else if (col === "detail" || col === "tensaubenh" || col === "tendichhai" || col === "chitiet") mapDetail = idx;
+    else if (col === "severitylevel" || col === "severity" || col === "mucdo" || col === "mucdonghiemtrong") mapSeverity = idx;
+    else if (col === "imageurls" || col === "imageurl" || col === "hinhanh" || col === "anh" || col === "urls") mapImages = idx;
+    else if (col === "description" || col === "mota" || col === "trieuchung") mapDesc = idx;
+    else if (col === "vfcsolution" || col === "solution" || col === "giaiphap" || col === "giaiphapvfc" || col === "thuoc") mapSolution = idx;
+    else if (col === "actionthreshold" || col === "threshold" || col === "nguong" || col === "nguonghanhdong") mapThreshold = idx;
+    else if (col === "pestdensity" || col === "density" || col === "matdo" || col === "matdosau") mapDensity = idx;
+  });
+
+  const hasMappedHeaders = mapCrop !== -1 && mapStage !== -1 && mapPest !== -1 && mapDetail !== -1 && mapSeverity !== -1;
 
   // Bỏ dòng tiêu đề
   const dataRows = records.slice(1);
-
   const parsed: ImportRow[] = [];
   let skippedInvalid = 0;
 
   for (const row of dataRows) {
-    let offset = hasIdColumn ? 1 : 0;
-    // Tự động nhận diện nếu cột đầu là CUID (trường hợp header không khớp)
-    if (!hasIdColumn && row[0] && row[0].length >= 24 && row[0].startsWith('c') && !row[0].includes(' ')) {
-      offset = 1;
+    let cropType = "";
+    let growthStage = "";
+    let pestDisease = "";
+    let detail = "";
+    let severityLevel = "";
+    let imageUrls: string[] = [];
+    let description = "";
+    let vfcSolution = "";
+    let actionThreshold = "";
+    let pestDensity = "";
+
+    if (hasMappedHeaders) {
+      cropType = (row[mapCrop] || "").trim();
+      growthStage = (row[mapStage] || "").trim();
+      pestDisease = (row[mapPest] || "").trim();
+      detail = (row[mapDetail] || "").trim();
+      severityLevel = cleanSeverity(row[mapSeverity] || "");
+      imageUrls = mapImages !== -1 ? splitUrls(row[mapImages] || "") : [];
+      description = mapDesc !== -1 ? (row[mapDesc] || "").trim() : "";
+      vfcSolution = mapSolution !== -1 ? (row[mapSolution] || "").trim() : "";
+      actionThreshold = mapThreshold !== -1 ? (row[mapThreshold] || "").trim() : "";
+      pestDensity = mapDensity !== -1 ? (row[mapDensity] || "").trim() : "";
+    } else {
+      // Fallback: Tự động phát hiện vị trí cột dựa trên dạng dữ liệu
+      let offset = 0;
+      // Nếu cột 0 là CUID / ID
+      if (row[0] && (row[0].length >= 24 || row[0].startsWith("c") || row[0].includes("-"))) {
+        offset = 1;
+      }
+      // Nếu cột tiếp theo là Số Thứ Tự (STT) nguyên số (1, 2, 3...)
+      if (/^\d+$/.test((row[offset] || "").trim())) {
+        offset += 1;
+      }
+
+      cropType = (row[offset] || "").trim();
+      growthStage = (row[offset + 1] || "").trim();
+      pestDisease = (row[offset + 2] || "").trim();
+      detail = (row[offset + 3] || "").trim();
+      severityLevel = cleanSeverity(row[offset + 4] || "");
+      imageUrls = splitUrls(row[offset + 5] || "");
+      description = (row[offset + 6] || "").trim();
+      vfcSolution = (row[offset + 7] || "").trim();
+      actionThreshold = (row[offset + 8] || "").trim();
+      pestDensity = (row[offset + 9] || "").trim();
     }
 
-    const cropType = (row[0 + offset] || "").trim();
-    const growthStage = (row[1 + offset] || "").trim();
-    const pestDisease = (row[2 + offset] || "").trim();
-    const detail = (row[3 + offset] || "").trim();
-    const severityLevel = (row[4 + offset] || "").trim();
-
-    // Bỏ qua các dòng thiếu trường bắt buộc
-    if (!cropType || !growthStage || !pestDisease || !detail || !severityLevel) {
+    // Kiểm tra tính hợp lệ: Bắt buộc không được để trống và cropType không thể là số hoặc ID
+    if (
+      !cropType ||
+      /^\d+$/.test(cropType) ||
+      cropType.length >= 24 ||
+      !growthStage ||
+      !pestDisease ||
+      !detail ||
+      !severityLevel
+    ) {
       skippedInvalid++;
       continue;
     }
@@ -121,11 +198,11 @@ export async function POST(request: NextRequest) {
       pestDisease,
       detail,
       severityLevel,
-      imageUrls: splitUrls(row[5 + offset] || ""),
-      description: (row[6 + offset] || "").trim(),
-      vfcSolution: (row[7 + offset] || "").trim(),
-      actionThreshold: (row[8 + offset] || "").trim(),
-      pestDensity: (row[9 + offset] || "").trim(),
+      imageUrls,
+      description,
+      vfcSolution,
+      actionThreshold,
+      pestDensity,
     });
   }
 

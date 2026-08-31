@@ -157,11 +157,12 @@ export default function AITrainingPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<PlanStageDisease | null>(null);
 
-  // Import
+  // Import & Export
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importMode, setImportMode] = useState<"skip" | "override">("skip");
   const [importing, setImporting] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
 
   // Form state
@@ -362,6 +363,43 @@ export default function AITrainingPage() {
     }
   };
 
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const queryParams = new URLSearchParams();
+      if (selectedCrop) {
+        queryParams.append("cropType", selectedCrop);
+      }
+      const url = `/api/admin/ai-training/export?${queryParams.toString()}`;
+      const res = await fetch(url);
+      if (!res.ok) {
+        toast.error("Không thể xuất tệp CSV");
+        return;
+      }
+      const blob = await res.blob();
+      const disposition = res.headers.get("Content-Disposition");
+      let filename = "plan_stage_diseases.csv";
+      if (disposition && disposition.includes("filename=")) {
+        const match = disposition.match(/filename="?([^";]+)"?/);
+        if (match && match[1]) filename = decodeURIComponent(match[1]);
+      }
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = downloadUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+      toast.success("Xuất tệp CSV thành công");
+    } catch (err) {
+      console.error(err);
+      toast.error("Có lỗi xảy ra khi xuất tệp CSV");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.cropType || !formData.growthStage || !formData.pestDisease || !formData.severityLevel || !formData.detail) {
@@ -429,6 +467,13 @@ export default function AITrainingPage() {
             className="rounded-lg border border-amber-500 px-4 py-2 text-sm font-semibold text-amber-700 shadow-sm hover:bg-amber-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500 disabled:opacity-50"
           >
             {syncing ? "Đang đồng bộ..." : "🔄 Đồng bộ cấu hình"}
+          </button>
+          <button
+            onClick={handleExport}
+            disabled={exporting}
+            className="rounded-lg border border-[#064E3B] px-4 py-2 text-sm font-semibold text-[#064E3B] shadow-sm hover:bg-[#064E3B]/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#064E3B] disabled:opacity-50"
+          >
+            {exporting ? "Đang xuất..." : "📥 Xuất CSV"}
           </button>
           <button
             onClick={handleOpenImport}
