@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 
 export interface OtpToastProps {
   otp: string;
@@ -13,83 +14,99 @@ export function OtpToast({ otp, type, onAutofill, onClose }: OtpToastProps) {
   const isReturningUser = type === 'otp';
 
   return (
-    <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 w-11/12 max-w-sm animate-in fade-in slide-in-from-top-4 duration-300">
-      <div className="relative overflow-hidden rounded-2xl bg-[#09382F]/95 backdrop-blur-md border border-[#FFD680]/40 p-4 shadow-[0_10px_30px_rgba(0,0,0,0.5),0_0_20px_rgba(255,214,128,0.2)] text-white">
-        {/* Glow decorative background */}
-        <div className="absolute -top-10 -right-10 w-24 h-24 bg-[#FFD680]/20 rounded-full blur-xl pointer-events-none" />
-
-        <div className="flex items-start justify-between gap-3">
+    <aside
+      aria-label="Thông báo mã xác thực OTP"
+      className="fixed top-3 left-1/2 -translate-x-1/2 z-50 w-[94%] max-w-sm transition-all duration-300 ease-out animate-in fade-in slide-in-from-top-6"
+    >
+      <div
+        onClick={onAutofill}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onAutofill?.();
+          }
+        }}
+        className="group relative overflow-hidden rounded-2xl bg-[#1C2421]/95 backdrop-blur-xl border border-white/20 p-3.5 shadow-[0_12px_36px_rgba(0,0,0,0.6),0_0_15px_rgba(255,214,128,0.15)] text-white cursor-pointer hover:border-[#FFD680]/50 active:scale-[0.99] transition-all select-none"
+      >
+        {/* Top App Header (iOS / Android System Notification style) */}
+        <div className="flex items-center justify-between gap-2 mb-2">
           <div className="flex items-center gap-2">
-            <span className="text-xl">
-              {isReturningUser ? '✨' : '⚡'}
-            </span>
-            <div>
-              <h4 className="text-xs font-black tracking-wider uppercase text-[#FFD680]">
-                {isReturningUser
-                  ? 'Thiết bị đã ghi nhớ'
-                  : 'Mã xác thực màn hình'}
-              </h4>
-              <p className="text-[11px] text-white/80 font-medium">
-                {isReturningUser
-                  ? 'Mã OTP được gửi trực tiếp đến bạn:'
-                  : 'Mã dự phòng hiển thị tự động:'}
-              </p>
+            <div className="w-5 h-5 rounded-md bg-[#0C4A3F] border border-white/20 flex items-center justify-center p-0.5 shadow-sm">
+              <Image
+                src="/assets/images/logo.svg"
+                alt="VFC"
+                width={16}
+                height={16}
+                className="w-full h-auto"
+              />
             </div>
+            <span className="text-[11px] font-bold text-white/70 uppercase tracking-wider">
+              {isReturningUser ? 'VFC • THIẾT BỊ ĐÃ LƯU' : 'VFC • TIN NHẮN MÃ OTP'}
+            </span>
           </div>
 
-          {onClose && (
-            <button
-              onClick={onClose}
-              className="text-white/60 hover:text-white p-1 transition rounded-md hover:bg-white/10"
-              title="Đóng"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-white/50 font-medium">vừa xong</span>
+            {onClose && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClose();
+                }}
+                className="text-white/40 hover:text-white p-1 rounded-full hover:bg-white/10 transition"
+                title="Đóng thông báo"
               >
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
-          )}
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* 4 Digit Boxes */}
-        <div className="mt-3 flex items-center justify-center gap-2">
-          {otp.split('').map((digit, i) => (
-            <span
-              key={i}
-              className="w-10 h-11 flex items-center justify-center text-2xl font-black text-[#0C4A3F] bg-[#FFD680] rounded-lg shadow-md tracking-wider animate-pulse"
-            >
-              {digit}
-            </span>
-          ))}
-        </div>
+        {/* Message Content */}
+        <div className="flex items-center justify-between gap-3 pt-0.5">
+          <div className="flex-1 min-w-0">
+            <p className="text-[13px] text-white font-medium leading-snug">
+              Mã xác thực của bạn là:{' '}
+              <span className="inline-block font-mono font-black text-[#FFD680] text-base tracking-widest px-2 py-0.5 bg-black/40 rounded-md border border-[#FFD680]/30 shadow-inner ml-1">
+                {otp}
+              </span>
+            </p>
+            <p className="text-[11px] text-white/60 mt-1">
+              Chạm để tự động điền hoặc nhập tay mã vào ô
+            </p>
+          </div>
 
-        {/* Action / Notification */}
-        <div className="mt-3 flex items-center justify-between pt-2 border-t border-white/10 text-[11px]">
-          <span className="text-emerald-300 font-semibold flex items-center gap-1">
-            <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-            Đã tự động điền mã
-          </span>
-
+          {/* Action Button */}
           {onAutofill && (
             <button
-              onClick={onAutofill}
-              className="px-2.5 py-1 bg-white/20 hover:bg-white/30 text-white font-bold rounded-md transition text-[10px] uppercase tracking-wide"
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAutofill();
+              }}
+              className="shrink-0 px-3 py-1.5 bg-[#FFD680] hover:bg-[#ffe09e] text-[#0C4A3F] font-bold text-xs rounded-full shadow-sm group-hover:brightness-105 active:scale-95 transition tracking-tight"
             >
-              Điền lại
+              Điền mã
             </button>
           )}
         </div>
       </div>
-    </div>
+    </aside>
   );
 }

@@ -89,20 +89,22 @@ function LoginContent() {
     checkSession();
   }, [router, redirectTo]);
 
-  // Tự động điền và kích hoạt xác thực khi nhận được OTP qua SSE
+  // Khi nhận được OTP qua SSE: Chuyển sang bước nhập OTP (nếu chưa chuyển), không tự động điền hay submit
   useEffect(() => {
+    if (otpEvent?.otp && otpEvent.otp.length === 4) {
+      setStep("otp");
+      setError("");
+    }
+  }, [otpEvent]);
+
+  // Người dùng chủ động chạm vào thông báo hoặc nút "Điền mã"
+  const handleAutofillOtp = () => {
     if (otpEvent?.otp && otpEvent.otp.length === 4) {
       const digits = otpEvent.otp.split("");
       setOtp(digits);
-      setStep("otp");
-      setError("");
-
-      const timer = setTimeout(() => {
-        handleVerifyOtp(digits);
-      }, 500);
-      return () => clearTimeout(timer);
+      handleVerifyOtp(digits);
     }
-  }, [otpEvent]);
+  };
 
   async function handleSendOtp(e?: React.FormEvent) {
     if (e) e.preventDefault();
@@ -206,11 +208,7 @@ function LoginContent() {
         <OtpToast
           otp={otpEvent.otp}
           type={otpEvent.type}
-          onAutofill={() => {
-            const digits = otpEvent.otp.split("");
-            setOtp(digits);
-            handleVerifyOtp(digits);
-          }}
+          onAutofill={handleAutofillOtp}
           onClose={resetOtpEvent}
         />
       )}
