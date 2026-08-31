@@ -43,7 +43,7 @@ export function OtpToast({ otp, type, onAutofill, onClose }: OtpToastProps) {
               />
             </div>
             <span className="text-[11px] font-bold text-white/70 uppercase tracking-wider">
-              {isReturningUser ? 'VFC • THIẾT BỊ ĐÃ LƯU' : 'VFC • TIN NHẮN MÃ OTP'}
+              VFC • TIN NHẮN MÃ XÁC THỰC
             </span>
           </div>
 
