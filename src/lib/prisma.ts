@@ -12,11 +12,16 @@ if (connectionString && !connectionString.includes("uselibpqcompat=true")) {
   connectionString = `${connectionString}${separator}uselibpqcompat=true`;
 }
 
+const isProduction = process.env.NODE_ENV === "production";
+
 const pool = new Pool({
   connectionString,
   ssl: connectionString?.includes("neon.tech")
     ? { rejectUnauthorized: false }
     : undefined,
+  max: isProduction ? 2 : 10,
+  idleTimeoutMillis: isProduction ? 10000 : 30000,
+  connectionTimeoutMillis: 5000,
 });
 
 pool.on("error", (err: any) => {
