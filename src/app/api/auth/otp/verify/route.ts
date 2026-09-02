@@ -9,6 +9,7 @@ import { linkSeIfMissing, resolveSeUser } from "@/lib/seAuth";
 import { getPhoneVariants, isValidVietnamesePhone } from "@/lib/phone";
 import { prisma } from "@/lib/prisma";
 import { ensureUserProfile } from "@/lib/userProfile";
+import { logger } from "@/lib/logger";
 import crypto from "crypto";
 
 const schema = z.object({
@@ -44,6 +45,16 @@ export async function POST(request: NextRequest) {
     });
 
     if (user) {
+      if (!user.isActive) {
+        return Response.json(
+          {
+            error: "ACCOUNT_DISABLED",
+            message: "Tài khoản của bạn đã bị tạm khóa. Vui lòng liên hệ quản trị viên.",
+          },
+          { status: 403 }
+        );
+      }
+
       await linkAgencyIfMissing(user, phoneVariants);
       await linkFarmerIfMissing(user, phoneVariants);
       await linkMdoIfMissing(user, phoneVariants);
@@ -79,7 +90,7 @@ export async function POST(request: NextRequest) {
     response.cookies.set(COOKIE_NAME, token, COOKIE_OPTIONS);
     return response;
   } catch (err: any) {
-    console.error("[OTP Verify Error]", err);
+    logger.error("[OTP Verify Error]", err);
     return Response.json({ error: "INTERNAL_SERVER_ERROR", message: err.message }, { status: 500 });
   }
 }

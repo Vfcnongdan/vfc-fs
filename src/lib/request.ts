@@ -22,7 +22,7 @@ export async function getRequestUser(request: NextRequest): Promise<RequestUser 
 
   if (sessionId) {
     const user = await prisma.user.findUnique({ where: { id } });
-    if (!user || user.sessionToken !== sessionId) return null;
+    if (!user || !user.isActive || user.sessionToken !== sessionId) return null;
   }
 
   return { id, phone, role };
