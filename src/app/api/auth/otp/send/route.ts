@@ -5,6 +5,7 @@ import { isPhoneAuthorizedForOtp } from "@/lib/otpAuth";
 import { getPhoneVariants, isValidVietnamesePhone } from "@/lib/phone";
 import { OtpController } from "@/controllers/OtpController";
 import { OtpServiceFactory } from "@/services/otp/OtpServiceFactory";
+import { logger } from "@/lib/logger";
 
 const schema = z.object({
   phone: z
@@ -37,7 +38,7 @@ export async function POST(request: NextRequest) {
       return Response.json(
         {
           error: "PHONE_NOT_AUTHORIZED",
-          message: "Số điện thoại này chưa được đăng ký trong hệ thống VFC",
+          message: "Số điện thoại này chưa được cấp quyền sử dụng hệ thống VFC",
         },
         { status: 403 }
       );
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
 
     if (isDevBypass) {
       await createOtpRecord(phone, "1111");
-      console.log(`[DEV BYPASS] OTP for ${phone}: 1111`);
+      logger.info(`[DEV BYPASS] OTP for ${phone}: 1111`);
       return Response.json({ success: true, message: "Mã OTP thử nghiệm đã được kích hoạt" });
     }
 
@@ -109,7 +110,7 @@ export async function POST(request: NextRequest) {
       channel: activeProvider,
     });
   } catch (err) {
-    console.error("[OTP Send Error]", err);
+    logger.error("[OTP Send Error]", err);
     return Response.json({ error: "INTERNAL_ERROR", message: "Có lỗi xảy ra ở máy chủ. Vui lòng thử lại sau" }, { status: 500 });
   }
 }

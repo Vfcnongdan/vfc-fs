@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { logger } from "@/lib/logger";
 
 /** Thời hạn mặc định của Zalo Refresh Token: 90 ngày */
 const REFRESH_TOKEN_EXPIRES_IN_SECONDS = 90 * 24 * 60 * 60; // 7,776,000s
@@ -100,7 +101,7 @@ export class ZaloTokenManager {
     }
 
     // Token sắp/đã hết hạn theo ngưỡng -> Gọi refresh bằng refresh_token từ DB
-    console.log(
+    logger.info(
       `[ZaloTokenManager] Token remaining time < threshold (${thresholdSeconds}s), auto-refreshing from DB refresh token...`
     );
     if (tokenRecord.refreshToken) {
@@ -120,7 +121,7 @@ export class ZaloTokenManager {
   async refreshAccessToken(refreshToken: string): Promise<string | null> {
     // Nếu đang có tiến trình refresh chạy dở, tái sử dụng Promise đó
     if (this.refreshPromise) {
-      console.log("[ZaloTokenManager] Refresh already in progress, awaiting existing promise...");
+      logger.info("[ZaloTokenManager] Refresh already in progress, awaiting existing promise...");
       return this.refreshPromise;
     }
 
@@ -128,7 +129,7 @@ export class ZaloTokenManager {
     const appSecret = process.env.ZALO_APP_SECRET;
 
     if (!appId || !appSecret || !refreshToken) {
-      console.warn(
+      logger.warn(
         "[ZaloTokenManager] Thiếu ZALO_APP_ID, ZALO_APP_SECRET hoặc Refresh Token để thực hiện refresh."
       );
       return null;
@@ -165,14 +166,14 @@ export class ZaloTokenManager {
             true,
             refreshTokenChanged ? REFRESH_TOKEN_EXPIRES_IN_SECONDS : undefined
           );
-          console.log("[ZaloTokenManager] Refreshed Zalo Access Token successfully.");
+          logger.info("[ZaloTokenManager] Refreshed Zalo Access Token successfully.");
           return data.access_token as string;
         } else {
-          console.error("[ZaloTokenManager] Refresh token failed from Zalo API:", data);
+          logger.error("[ZaloTokenManager] Refresh token failed from Zalo API:", data);
           return null;
         }
       } catch (error) {
-        console.error("[ZaloTokenManager] Exception during token refresh:", error);
+        logger.error("[ZaloTokenManager] Exception during token refresh:", error);
         return null;
       } finally {
         this.refreshPromise = null;
@@ -283,7 +284,7 @@ export class ZaloTokenManager {
         params.append("code_verifier", codeVerifier);
       }
 
-      console.log(
+      logger.info(
         `[ZaloTokenManager] Exchange request - app_id: ${appId}, code length: ${code.length}, code_verifier: ${
           codeVerifier ? `present (${codeVerifier.length} chars)` : "MISSING"
         }`
@@ -328,7 +329,7 @@ export class ZaloTokenManager {
         };
       }
     } catch (error: any) {
-      console.error("[ZaloTokenManager] Code exchange exception:", error);
+      logger.error("[ZaloTokenManager] Code exchange exception:", error);
       return {
         success: false,
         error: error?.message || "Lỗi kết nối tới Zalo OAuth API",

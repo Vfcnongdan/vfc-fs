@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken, COOKIE_NAME, Role } from "@/lib/auth";
+import { logger } from "@/lib/logger";
 
 // Route protection config
 const PUBLIC_PATHS = ["/", "/assets", "/api/auth/otp/send", "/api/auth/otp/verify", "/api/auth/zalo/callback", "/zalo_verifierOyIX99Bk6tXmqSnrjELRVNV3wrIRjJ4FCpap.html"];
@@ -34,7 +35,7 @@ export async function middleware(request: NextRequest) {
   const token = bearerToken || request.cookies.get(COOKIE_NAME)?.value;
   const session = token ? await verifyToken(token) : null;
 
-  console.log(`[Middleware] Path: ${pathname}, Token: ${!!token}, Session: ${!!session}`);
+  logger.info(`[Middleware] Path: ${pathname}, Token: ${!!token}, Session: ${!!session}`);
 
   // Not authenticated → redirect to login
   if (!session) {

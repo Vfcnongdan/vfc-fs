@@ -1,7 +1,9 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getRequestUser, apiError, apiOk } from "@/lib/request";
+import { Role } from "@prisma/client";
 import { invalidateCropOptionsCache } from "@/lib/cropOptions";
+import { logger } from "@/lib/logger";
 import type { CropGrowthStageOptions } from "@/lib/deseaseDetails";
 
 const CONFIG_KEY = "crop-options";
@@ -113,7 +115,7 @@ export async function POST(request: NextRequest) {
     // Xóa cache server-side để lần đọc tiếp load lại từ DB
     invalidateCropOptionsCache();
 
-    console.log(
+    logger.info(
       `[Crop Options Sync] Generated ${options.length} crop(s) from ${records.length} training records → DB`,
     );
 
@@ -123,7 +125,7 @@ export async function POST(request: NextRequest) {
       totalRecords: records.length,
     });
   } catch (err) {
-    console.error("[Crop Options Sync Error]", err);
+    logger.error("[Crop Options Sync Error]", err);
     return apiError("SYNC_FAILED", 500);
   }
 }

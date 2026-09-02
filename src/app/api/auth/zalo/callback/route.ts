@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ZaloTokenManager } from "@/services/zalo/ZaloTokenManager";
 import { cookies } from "next/headers";
+import { logger } from "@/lib/logger";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -8,7 +9,7 @@ export async function GET(request: NextRequest) {
   const state = searchParams.get("state");
   const codeChallenge = searchParams.get("code_challenge");
 
-  console.log(`[Zalo Callback] URL: ${request.nextUrl.pathname}, Host: ${request.headers.get("host")}`);
+  logger.info(`[Zalo Callback] URL: ${request.nextUrl.pathname}, Host: ${request.headers.get("host")}`);
 
   if (!code) {
     return NextResponse.json(
@@ -21,11 +22,11 @@ export async function GET(request: NextRequest) {
   const codeVerifier = cookieStore.get("zalo_pkce_code_verifier")?.value;
   const storedState = cookieStore.get("zalo_pkce_state")?.value;
 
-  console.log(`[Zalo Callback] code_verifier cookie present: ${!!codeVerifier}, state cookie present: ${!!storedState}`);
-  console.log(`[Zalo Callback] URL state: ${state}, Cookie state: ${storedState}`);
+  logger.info(`[Zalo Callback] code_verifier cookie present: ${!!codeVerifier}, state cookie present: ${!!storedState}`);
+  logger.info(`[Zalo Callback] URL state: ${state}, Cookie state: ${storedState}`);
 
   if (!codeVerifier) {
-    console.error("[Zalo Callback] code_verifier cookie is MISSING! This is likely a domain mismatch issue (www vs non-www).");
+    logger.error("[Zalo Callback] code_verifier cookie is MISSING! This is likely a domain mismatch issue (www vs non-www).");
     return NextResponse.json(
       {
         error: "MISSING_CODE_VERIFIER",

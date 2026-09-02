@@ -7,6 +7,7 @@ import {
   validateImagesWithGroq,
   runAiDiagnosis,
 } from "@/lib/aiDiagnosis";
+import { logger } from "@/lib/logger";
 
 export const maxDuration = 90;
 
@@ -47,7 +48,7 @@ async function proxyCreateDiagnosis(request: NextRequest, user: any) {
     buffer = null;
   }
 
-  console.log(
+  logger.info(
     `[Proxy POST Diagnosis] Sending to ${MICROSERVICE_URL}/api/v1/diagnoses | User: ${user.id} | Crop: ${cropType}`
   );
 
@@ -70,7 +71,7 @@ async function proxyCreateDiagnosis(request: NextRequest, user: any) {
     const data = await response.json();
     return apiOk(data, response.status);
   } catch (err: any) {
-    console.error("[Proxy POST Diagnosis Error]", err);
+    logger.error("[Proxy POST Diagnosis Error]", err);
     return apiError(
       `Không thể kết nối đến dịch vụ chẩn đoán AI (${err.message}). Vui lòng thử lại sau.`,
       502
@@ -94,7 +95,7 @@ async function proxyListDiagnoses(request: NextRequest, user: any) {
     const data = await response.json();
     return apiOk(data, response.status);
   } catch (err: any) {
-    console.error("[Proxy GET Diagnoses Error]", err);
+    logger.error("[Proxy GET Diagnoses Error]", err);
     return apiError(
       "Không thể kết nối đến dịch vụ chẩn đoán AI. Vui lòng thử lại sau.",
       502
@@ -143,10 +144,10 @@ async function legacyCreateDiagnosis(request: NextRequest, user: any) {
       status: DiagnosisStatus.PROCESSING,
     },
   });
-  console.log(`[POST AI Diagnosis] Created ID: ${diagnosis.id} | User: ${user.id} | Crop: ${cropType}`);
+  logger.info(`[POST AI Diagnosis] Created ID: ${diagnosis.id} | User: ${user.id} | Crop: ${cropType}`);
 
   try {
-    console.log(`[POST AI Diagnosis] Start validation | ID: ${diagnosis.id} | Crop: ${cropType}`);
+    logger.info(`[POST AI Diagnosis] Start validation | ID: ${diagnosis.id} | Crop: ${cropType}`);
     const validationResult = await validateImagesWithGroq(
       base64ImagesSmall,
       cropType ?? undefined
@@ -166,7 +167,7 @@ async function legacyCreateDiagnosis(request: NextRequest, user: any) {
             status: DiagnosisStatus.DONE,
           },
         });
-        console.log(
+        logger.info(
           `[POST AI Diagnosis] WRONG_CROP | ID: ${diagnosis.id} | plantInfo: ${validationResult.plantInfo?.slice(0, 100) ?? "null"}`
         );
         return apiOk({
@@ -186,7 +187,7 @@ async function legacyCreateDiagnosis(request: NextRequest, user: any) {
           status: DiagnosisStatus.DONE,
         },
       });
-      console.log(
+      logger.info(
         `[POST AI Diagnosis] Validation FAILED | ID: ${diagnosis.id} | reasonCode: ${validationResult.reasonCode} | guidance: ${validationResult.userGuidance}`
       );
       return apiError(validationResult.userGuidance, 400);
@@ -195,7 +196,7 @@ async function legacyCreateDiagnosis(request: NextRequest, user: any) {
     const cropOption = await getCropOptionByType(cropType ?? undefined);
     const availableStages = cropOption?.growthStages ?? [];
 
-    console.log(
+    logger.info(
       `[AI Diagnosis Stage Check] ID: ${diagnosis.id}, Crop: ${cropType}, detectedStage: ${validationResult.detectedGrowthStage}, availableStages: ${availableStages.length}`
     );
 
@@ -214,7 +215,7 @@ async function legacyCreateDiagnosis(request: NextRequest, user: any) {
           status: DiagnosisStatus.DONE,
         },
       });
-      console.log(
+      logger.info(
         `[POST AI Diagnosis] AWAITING_STAGE | ID: ${diagnosis.id} | Stages: ${availableStages.length} | Detected: ${validationResult.detectedGrowthStage} | Pest: ${validationResult.detectedPestDisease} | Severity: ${validationResult.detectedSeverityLevel}`
       );
       return apiOk({
@@ -226,7 +227,7 @@ async function legacyCreateDiagnosis(request: NextRequest, user: any) {
       });
     }
 
-    console.log(
+    logger.info(
       `[POST AI Diagnosis] Start AI diagnosis | ID: ${diagnosis.id} | Crop: ${cropType} | Stage: ${growthStage ?? validationResult.detectedGrowthStage ?? "any"} | Pest: ${validationResult.detectedPestDisease ?? "any"} | Severity: ${validationResult.detectedSeverityLevel ?? "any"}`
     );
     await runAiDiagnosis(
@@ -238,7 +239,7 @@ async function legacyCreateDiagnosis(request: NextRequest, user: any) {
       validationResult.detectedSeverityLevel ?? undefined
     );
   } catch (err) {
-    console.error("[POST AI Diagnosis Error]", err);
+    logger.error("[POST AI Diagnosis Error]", err);
     await prisma.plantDiagnosis.update({
       where: { id: diagnosis.id },
       data: { status: DiagnosisStatus.FAILED },

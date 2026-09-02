@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getRequestUser, apiError, apiOk } from "@/lib/request";
 import { Role, DiagnosisStatus } from "@prisma/client";
 import { runAiDiagnosis } from "@/lib/aiDiagnosis";
+import { logger } from "@/lib/logger";
 
 export const maxDuration = 90;
 
@@ -42,7 +43,7 @@ async function proxyGetDiagnosis(id: string, user: any) {
     const data = await response.json();
     return apiOk(data, response.status);
   } catch (err: any) {
-    console.error("[Proxy GET Diagnosis Detail Error]", err);
+    logger.error("[Proxy GET Diagnosis Detail Error]", err);
     return apiError(
       `Không thể kết nối đến dịch vụ chẩn đoán AI (${err.message}). Vui lòng thử lại sau.`,
       502
@@ -69,7 +70,7 @@ async function proxyConfirmStage(request: NextRequest, id: string, user: any) {
     const data = await response.json();
     return apiOk(data, response.status);
   } catch (err: any) {
-    console.error("[Proxy PATCH Stage Error]", err);
+    logger.error("[Proxy PATCH Stage Error]", err);
     return apiError(
       `Không thể kết nối đến dịch vụ chẩn đoán AI (${err.message}). Vui lòng thử lại sau.`,
       502
@@ -116,7 +117,7 @@ async function legacyConfirmStage(request: NextRequest, id: string, user: any) {
 
   const awaitingPayload = diagnosis.rawAiResponse;
   if (!isAwaitingStagePayload(awaitingPayload)) {
-    console.log(`[PATCH AI Diagnosis] INVALID_STATE | ID: ${id} | rawAiResponse: ${JSON.stringify(awaitingPayload)}`);
+    logger.info(`[PATCH AI Diagnosis] INVALID_STATE | ID: ${id} | rawAiResponse: ${JSON.stringify(awaitingPayload)}`);
     return apiError("INVALID_STATE", 400);
   }
 
@@ -127,7 +128,7 @@ async function legacyConfirmStage(request: NextRequest, id: string, user: any) {
       rawAiResponse: { processingStage: growthStage },
     },
   });
-  console.log(`[PATCH AI Diagnosis] Start stage-confirmed diagnosis | ID: ${id} | Stage: ${growthStage}`);
+  logger.info(`[PATCH AI Diagnosis] Start stage-confirmed diagnosis | ID: ${id} | Stage: ${growthStage}`);
 
   const base64Images = body?.base64Images as string[] | undefined;
   if (!base64Images?.length) {
@@ -135,7 +136,7 @@ async function legacyConfirmStage(request: NextRequest, id: string, user: any) {
   }
 
   try {
-    console.log(
+    logger.info(
       `[PATCH AI Diagnosis] Start AI diagnosis | ID: ${id} | Crop: ${diagnosis.cropType} | Stage: ${growthStage} | Pest: ${awaitingPayload.detectedPestDisease ?? "any"} | Severity: ${awaitingPayload.detectedSeverityLevel ?? "any"}`
     );
     await runAiDiagnosis(
@@ -147,7 +148,7 @@ async function legacyConfirmStage(request: NextRequest, id: string, user: any) {
       awaitingPayload.detectedSeverityLevel ?? undefined
     );
   } catch (err) {
-    console.error(`[PATCH AI Diagnosis Error] | ID: ${id}`, err);
+    logger.error(`[PATCH AI Diagnosis Error] | ID: ${id}`, err);
     await prisma.plantDiagnosis.update({
       where: { id },
       data: { status: DiagnosisStatus.FAILED },

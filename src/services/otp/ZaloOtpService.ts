@@ -1,5 +1,6 @@
 import { IOtpService } from './IOtpService';
 import { ZaloTokenManager } from '../zalo/ZaloTokenManager';
+import { logger } from '@/lib/logger';
 
 export class ZaloOtpService implements IOtpService {
   private accessToken?: string;
@@ -12,7 +13,7 @@ export class ZaloOtpService implements IOtpService {
 
   async sendOtp(recipientId: string, otp: string, phone: string): Promise<boolean> {
     if (process.env.NODE_ENV !== 'production' && !this.forceRealSend) {
-      console.log(`[DEV] Zalo OTP for ${phone}: ${otp}`);
+      logger.info(`[DEV] Zalo OTP for ${phone}: ${otp}`);
       return true;
     }
 
@@ -44,10 +45,10 @@ export class ZaloOtpService implements IOtpService {
 
         const result = await response.json();
         if (result.error === 0) {
-          console.log(`[Zalo ZNS Success] Sent OTP to ${formattedPhone}`);
+          logger.info(`[Zalo ZNS Success] Sent OTP to ${formattedPhone}`);
           return true;
         }
-        console.warn(
+        logger.warn(
           '[Zalo ZNS Failed], trying OA Message fallback if user_id is provided:',
           result
         );
@@ -70,14 +71,14 @@ export class ZaloOtpService implements IOtpService {
 
       const result = await response.json();
       if (result.error === 0) {
-        console.log(`[Zalo OA Message Success] Sent OTP to ${recipientId}`);
+        logger.info(`[Zalo OA Message Success] Sent OTP to ${recipientId}`);
         return true;
       }
 
-      console.error('[Zalo OA Message Failed]:', result);
+      logger.error('[Zalo OA Message Failed]:', result);
       return false;
     } catch (error) {
-      console.error('Zalo OTP Error:', error);
+      logger.error('Zalo OTP Error:', error);
       return false;
     }
   }

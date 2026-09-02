@@ -1,4 +1,5 @@
 import { IOtpService } from './IOtpService';
+import { logger } from '@/lib/logger';
 
 export interface ChannelConfig {
   name: string;
@@ -16,7 +17,7 @@ export class MultiChannelOtpService implements IOtpService {
   async sendOtp(to: string, otp: string, phone: string): Promise<boolean> {
     const results = await Promise.allSettled(
       this.channels.map(async ({ name, service, target }) => {
-        console.log(`[MultiChannel] Sending OTP via ${name} to target: ${target}`);
+        logger.info(`[MultiChannel] Sending OTP via ${name} to target: ${target}`);
         const success = await service.sendOtp(target, otp, phone);
         return { name, success };
       })
@@ -26,10 +27,10 @@ export class MultiChannelOtpService implements IOtpService {
     results.forEach((res) => {
       if (res.status === 'fulfilled' && res.value.success) {
         successCount++;
-        console.log(`[MultiChannel] ${res.value.name}: SUCCESS`);
+        logger.info(`[MultiChannel] ${res.value.name}: SUCCESS`);
       } else {
         const reason = res.status === 'rejected' ? res.reason : 'Returned false';
-        console.warn(`[MultiChannel] Channel failed:`, reason);
+        logger.warn(`[MultiChannel] Channel failed:`, reason);
       }
     });
 

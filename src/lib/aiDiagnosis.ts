@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { getCropOptionByType } from "@/lib/cropOptions";
 import { DiagnosisStatus } from "@prisma/client";
 import { eqStr, includesStr } from "@/lib/utils";
+import { logger } from "@/lib/logger";
 
 type AiProvider = "gemini" | "openrouter";
 
@@ -98,7 +99,7 @@ export async function fetchAndOptimizeImage(rawUrl: string): Promise<string | nu
       .toBuffer();
     return buffer.toString("base64");
   } catch (err) {
-    console.error("Failed to fetch/optimize ref image:", rawUrl, err);
+    logger.error("Failed to fetch/optimize ref image:", rawUrl, err);
     return null;
   }
 }
@@ -108,7 +109,7 @@ function parseJsonBlock(text: string, provider: string) {
   const stripped = text.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
   const jsonMatch = stripped.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
-    console.error(
+    logger.error(
       `[AI Parse Error] No JSON block found in ${provider} response. Raw text:`,
       text
     );
@@ -236,7 +237,7 @@ function parseImageValidationJson(
     if (matched) {
       detectedGrowthStage = matched;
     } else {
-      console.warn(
+      logger.warn(
         `[AI Validation] detectedGrowthStage "${parsed.detectedGrowthStage}" not found in allowedStages:`,
         allowedStages
       );
@@ -252,7 +253,7 @@ function parseImageValidationJson(
     if (matched) {
       detectedPestDisease = matched;
     } else {
-      console.warn(
+      logger.warn(
         `[AI Validation] detectedPestDisease "${parsed.detectedPestDisease}" not found in allowedPestDiseases:`,
         allowedPestDiseases
       );
@@ -268,7 +269,7 @@ function parseImageValidationJson(
     if (matched) {
       detectedSeverityLevel = matched;
     } else {
-      console.warn(
+      logger.warn(
         `[AI Validation] detectedSeverityLevel "${parsed.detectedSeverityLevel}" not found in allowedSeverityLevels:`,
         allowedSeverityLevels
       );
@@ -321,7 +322,7 @@ export async function validateImagesWithGroq(
   const apiKey =
     process.env.OPENROUTER_API_VALIDATION_KEY || process.env.OPENROUTER_API_KEY;
   const hasApiKey = !!apiKey;
-  console.log(
+  logger.info(
     `[AI Plan Validation OpenRouter API Key Check] Key exists: ${hasApiKey}`
   );
   if (!hasApiKey) {
@@ -344,7 +345,7 @@ export async function validateImagesWithGroq(
 
   for (let idx = 0; idx < base64Images.length; idx++) {
     const base64Data = base64Images[idx];
-    console.log(
+    logger.info(
       `[AI Plan Validation Payload] Image ${idx} size: ${((base64Data.length * 0.75) / 1024).toFixed(2)} KB`
     );
     content.push({
@@ -356,7 +357,7 @@ export async function validateImagesWithGroq(
   const model =
     process.env.OPENROUTER_VISION_MODEL ||
     "meta-llama/llama-3.2-11b-vision-instruct:free";
-  console.log(
+  logger.info(
     `[AI Plan Validation API Call] Sending request to OpenRouter (${model})...`
   );
 
@@ -389,7 +390,7 @@ export async function validateImagesWithGroq(
     throw new Error("OpenRouter plan validation API returned an empty response");
   }
 
-  console.log(
+  logger.info(
     `[AI Plan Validation Response] Text length: ${text.length}\nRaw text:`, text
   );
   return parseImageValidationJson(text, cropType, allowedStages, allowedPestDiseases, allowedSeverityLevels);
@@ -411,7 +412,7 @@ async function analyzeWithGemini(
   referenceData: ReferenceData[]
 ): Promise<AiDiagnosisResponse> {
   const hasApiKey = !!process.env.GEMINI_API_KEY;
-  console.log(`[AI Diagnosis Gemini API Key Check] Key exists: ${hasApiKey}`);
+  logger.info(`[AI Diagnosis Gemini API Key Check] Key exists: ${hasApiKey}`);
   if (!hasApiKey) {
     throw new Error("GEMINI_API_KEY is not defined in environment variables");
   }
@@ -438,10 +439,10 @@ async function analyzeWithGemini(
   }
   parts.push({ text: `\n\n${prompt}` });
 
-  console.log("[AI Diagnosis API Call] Sending request to Gemini API...");
+  logger.info("[AI Diagnosis API Call] Sending request to Gemini API...");
   const result = await model.generateContent(parts);
   const text = result.response.text();
-  console.log(
+  logger.info(
     `[AI Diagnosis Gemini Response] Received response. Text length: ${text.length}\nRaw text:`, text
   );
   return parseAiJson(text, "gemini");
@@ -453,7 +454,7 @@ async function analyzeWithOpenRouter(
   referenceData: ReferenceData[]
 ): Promise<AiDiagnosisResponse> {
   const hasApiKey = !!process.env.OPENROUTER_API_KEY;
-  console.log(`[AI Diagnosis OpenRouter API Key Check] Key exists: ${hasApiKey}`);
+  logger.info(`[AI Diagnosis OpenRouter API Key Check] Key exists: ${hasApiKey}`);
   if (!hasApiKey) {
     throw new Error("OPENROUTER_API_KEY is not defined in environment variables");
   }
@@ -480,7 +481,7 @@ async function analyzeWithOpenRouter(
   content.push({ type: "text", text: `\n\n${prompt}` });
 
   const model = process.env.OPENROUTER_MODEL || "google/gemini-flash-1.5";
-  console.log(`[AI Diagnosis API Call] Sending request to OpenRouter (${model})...`);
+  logger.info(`[AI Diagnosis API Call] Sending request to OpenRouter (${model})...`);
 
   const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
@@ -509,7 +510,7 @@ async function analyzeWithOpenRouter(
   const text = data?.choices?.[0]?.message?.content;
   if (!text) throw new Error("OpenRouter API returned an empty response");
 
-  console.log(
+  logger.info(
     `[AI Diagnosis OpenRouter Response] Received response. Text length: ${text.length}\nRaw text:`, text
   );
   return parseAiJson(text, "openrouter");
@@ -522,18 +523,18 @@ async function analyzeWithFallback(
 ): Promise<AiDiagnosisResponse> {
   // 1st: Gemini
   try {
-    console.log("[AI Fallback] Trying Gemini...");
+    logger.info("[AI Fallback] Trying Gemini...");
     const parsed = await analyzeWithGemini(prompt, userImages, referenceData);
-    console.log(`[AI Fallback] Gemini succeeded | Provider: gemini | Disease: ${parsed.disease} | Products: ${parsed.solutionSets?.length ?? 0} sets`);
+    logger.info(`[AI Fallback] Gemini succeeded | Provider: gemini | Disease: ${parsed.disease} | Products: ${parsed.solutionSets?.length ?? 0} sets`);
     return { ...parsed, aiProvider: "gemini" };
   } catch (geminiError) {
-    console.error("[AI Fallback] Gemini failed, trying OpenRouter", geminiError);
+    logger.error("[AI Fallback] Gemini failed, trying OpenRouter", geminiError);
   }
 
   // 2nd: OpenRouter
-  console.log("[AI Fallback] Trying OpenRouter...");
+  logger.info("[AI Fallback] Trying OpenRouter...");
   const parsed = await analyzeWithOpenRouter(prompt, userImages, referenceData);
-  console.log(`[AI Fallback] OpenRouter succeeded | Provider: openrouter | Disease: ${parsed.disease} | Products: ${parsed.solutionSets?.length ?? 0} sets`);
+  logger.info(`[AI Fallback] OpenRouter succeeded | Provider: openrouter | Disease: ${parsed.disease} | Products: ${parsed.solutionSets?.length ?? 0} sets`);
   return { ...parsed, aiProvider: "openrouter", fallbackFrom: "gemini" };
 }
 
@@ -545,7 +546,7 @@ export async function runAiDiagnosis(
   pestDisease?: string,
   severityLevel?: string
 ) {
-  console.log(
+  logger.info(
     `[AI Diagnosis Start] ID: ${diagnosisId}, Crop: ${cropType}, Stage: ${growthStage}, Pest: ${pestDisease ?? "any"}, Severity: ${severityLevel ?? "any"}`
   );
 
@@ -581,15 +582,15 @@ export async function runAiDiagnosis(
     if (filtered.length > 0) relevantDiseases = filtered;
   }
 
-  console.log(
+  logger.info(
     `[AI Diagnosis Reference Data] ID: ${diagnosisId}, matched ${relevantDiseases.length} reference records`
   );
-  console.log(
+  logger.info(
     `[AI Diagnosis Filter] ID: ${diagnosisId} | Crop: ${cropType} | Stage: ${growthStage} | Pest: ${pestDisease ?? "any"} | Severity: ${severityLevel ?? "any"} -> ${relevantDiseases.length} records`
   );
 
   if (relevantDiseases.length > MAX_REFERENCE_ITEMS) {
-    console.warn(
+    logger.warn(
       `[AI Diagnosis Too Many References] ID: ${diagnosisId}, ${relevantDiseases.length} records -> randomly sampling ${MAX_REFERENCE_ITEMS}`
     );
     relevantDiseases = relevantDiseases
@@ -633,9 +634,9 @@ export async function runAiDiagnosis(
         reasonsMap[product.id] =
           parsed.reasons?.[pName] ||
           `Phù hợp với triệu chứng: ${parsed.disease}`;
-        console.log(`[AI Diagnosis Product Match] ID: ${diagnosisId} | AI name: "${pName}" -> matched product: ${product.id} (${product.name})`);
+        logger.info(`[AI Diagnosis Product Match] ID: ${diagnosisId} | AI name: "${pName}" -> matched product: ${product.id} (${product.name})`);
       } else if (!product) {
-        console.warn(`[AI Diagnosis Product NOT Found] ID: ${diagnosisId} | AI name: "${pName}" not found in ${allProducts.length} active products`);
+        logger.warn(`[AI Diagnosis Product NOT Found] ID: ${diagnosisId} | AI name: "${pName}" not found in ${allProducts.length} active products`);
       }
     }
 
@@ -659,9 +660,9 @@ export async function runAiDiagnosis(
       },
     });
 
-    console.log(`[AI Diagnosis Success] ID: ${diagnosisId}`);
+    logger.info(`[AI Diagnosis Success] ID: ${diagnosisId}`);
   } catch (err) {
-    console.error(`[AI Diagnosis Error] ID: ${diagnosisId}`, err);
+    logger.error(`[AI Diagnosis Error] ID: ${diagnosisId}`, err);
     const needsClearerImage = err instanceof NeedsClearerImageError;
     await prisma.plantDiagnosis.update({
       where: { id: diagnosisId },
