@@ -18,15 +18,22 @@ type ImportRow = {
   pestDensity: string;
 };
 
-// Khóa tự nhiên để nhận diện bản ghi trùng lặp
+// Khóa tự nhiên để nhận diện bản ghi trùng lặp (bao gồm cả danh sách hình ảnh)
 function naturalKey(r: {
   cropType: string;
   growthStage: string;
   pestDisease: string;
   detail: string;
   severityLevel: string;
+  imageUrls?: string[];
 }) {
-  return [r.cropType, r.growthStage, r.pestDisease, r.detail, r.severityLevel]
+  const normUrls = (r.imageUrls || [])
+    .map((u) => (u || "").trim().toLowerCase().replace(/\/+$/, ""))
+    .filter(Boolean)
+    .sort()
+    .join("##");
+
+  return [r.cropType, r.growthStage, r.pestDisease, r.detail, r.severityLevel, normUrls]
     .map((v) => (v || "").trim().toLowerCase())
     .join("||");
 }
@@ -251,6 +258,7 @@ export async function POST(request: NextRequest) {
         pestDisease: true,
         detail: true,
         severityLevel: true,
+        imageUrls: true,
       },
     });
     const existingKeys = new Set(existing.map((e) => naturalKey(e)));

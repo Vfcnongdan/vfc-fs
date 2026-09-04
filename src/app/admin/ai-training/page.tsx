@@ -939,7 +939,7 @@ export default function AITrainingPage() {
                     <span className="block text-sm font-medium text-gray-900">Bỏ qua trùng lặp</span>
                     <span className="block text-xs text-gray-500">
                       Giữ nguyên dữ liệu hiện có, chỉ thêm bản ghi mới. Loại các dòng trùng (Cây +
-                      Giai đoạn + Dịch hại + Chi tiết + Cấp độ).
+                      Giai đoạn + Dịch hại + Chi tiết + Cấp độ + Hình ảnh).
                     </span>
                   </span>
                 </label>
