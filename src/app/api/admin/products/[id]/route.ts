@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getRequestUser, apiError, apiOk } from "@/lib/request";
+import { invalidateDiagnosisProductsCache } from "@/services/productCacheDiagnosis";
 
 export async function GET(
   request: NextRequest,
@@ -63,6 +64,7 @@ export async function PUT(
       include: { detail: true, category: true },
     });
 
+    invalidateDiagnosisProductsCache();
     return apiOk(product);
   } catch (error) {
     console.error("[Admin Product PUT]", error);
@@ -80,6 +82,7 @@ export async function DELETE(
 
   try {
     await prisma.product.delete({ where: { id } });
+    invalidateDiagnosisProductsCache();
     return apiOk({ success: true });
   } catch (error) {
     console.error("[Admin Product DELETE]", error);

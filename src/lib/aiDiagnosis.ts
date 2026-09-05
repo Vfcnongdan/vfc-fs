@@ -2,6 +2,10 @@ import { prisma } from "@/lib/prisma";
 import { getCropOptionByType } from "@/lib/cropOptions";
 import { DiagnosisStatus } from "@prisma/client";
 import { eqStr, includesStr } from "@/lib/utils";
+import {
+  getDiagnosisProducts,
+  findProductByAiName,
+} from "@/services/productCacheDiagnosis";
 import { logger } from "@/lib/logger";
 
 type AiProvider = "gemini" | "openrouter";
@@ -550,10 +554,7 @@ export async function runAiDiagnosis(
     `[AI Diagnosis Start] ID: ${diagnosisId}, Crop: ${cropType}, Stage: ${growthStage}, Pest: ${pestDisease ?? "any"}, Severity: ${severityLevel ?? "any"}`
   );
 
-  const allProducts = await prisma.product.findMany({
-    where: { isActive: true },
-    select: { id: true, name: true },
-  });
+  const allProducts = await getDiagnosisProducts();
 
   // Query dữ liệu đối chứng từ DB — thu hẹp dần theo từng tiêu chí có sẵn
   const baseWhere = {
@@ -624,11 +625,7 @@ export async function runAiDiagnosis(
       parsed.suggestedProducts ||
       [];
     for (const pName of extractedProducts) {
-      const product = allProducts.find(
-        (p) =>
-          includesStr(p.name, pName) ||
-          includesStr(pName, p.name)
-      );
+      const product = await findProductByAiName(pName);
       if (product && !validProductIds.includes(product.id)) {
         validProductIds.push(product.id);
         reasonsMap[product.id] =

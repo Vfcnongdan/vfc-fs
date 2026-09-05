@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getRequestUser, apiError, apiOk } from "@/lib/request";
+import { invalidateDiagnosisProductsCache } from "@/services/productCacheDiagnosis";
 
 export async function GET(request: NextRequest) {
   const user = await getRequestUser(request);
@@ -71,6 +72,7 @@ export async function POST(request: NextRequest) {
       include: { detail: true, category: true },
     });
 
+    invalidateDiagnosisProductsCache();
     return apiOk(product);
   } catch (error) {
     console.error("[Admin Products POST]", error);
