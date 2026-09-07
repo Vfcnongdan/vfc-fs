@@ -7,6 +7,7 @@ import { Camera, Package, MapPin, Plus } from "lucide-react";
 import { getCropImagePath } from "@/lib/cropIcons";
 import { useCropStore } from "@/store/useCropStore";
 import { WeatherBadge } from "@/components/WeatherBadge";
+import { removeStoredToken } from "@/lib/auth-client";
 
 export default function FarmerHomePage() {
   const [user, setUser] = useState<{ name: string | null } | null>(null);
@@ -22,6 +23,7 @@ export default function FarmerHomePage() {
           const userData = await userRes.json();
           setUser(userData.user);
         } else if (userRes.status === 401) {
+          removeStoredToken(); // Xóa token cũ khỏi localStorage trước khi redirect
           window.location.href = "/";
         }
       } catch (err) {
@@ -43,7 +45,7 @@ export default function FarmerHomePage() {
             <h2 className="text-xl font-bold">
               Xin chào, {user?.name || "Nông dân"}! 👋
             </h2>
-            <p className="mt-1 text-sm text-green-500">
+            <p className="mt-1 text-sm text-white/90">
               Cây của bạn hôm nay thế nào?
             </p>
           </div>
@@ -56,53 +58,62 @@ export default function FarmerHomePage() {
         </div>
 
         {/* My Crops Section */}
-        <div className="card bg-[#0C4A3F] border border-white/10 text-white p-4 rounded-2xl shadow-md">
-          <h3 className="text-lg font-bold">Cây trồng của tôi</h3>
-          <p className="text-xs text-white/70 mt-1 mb-4">
+        <div className="card bg-vfc-mint border border-vfc-green/10 text-vfc-green p-4 rounded-2xl shadow-xs">
+          <div className="flex items-center justify-between mb-1">
+            <h3 className="text-base font-bold text-vfc-green">Cây trồng của tôi</h3>
+            {userCrops.length > 0 && (
+              <Link
+                href="/farmer/crops/select"
+                className="text-xs font-semibold text-vfc-green/80 hover:text-vfc-green hover:underline"
+              >
+                Chỉnh sửa
+              </Link>
+            )}
+          </div>
+          <p className="text-xs text-vfc-green/70 mb-3">
             Thêm các loại cây trồng để nhận biết thông tin liên quan mới nhất
           </p>
 
           {loading ? (
-            <div className="h-20 flex items-center justify-center">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#FFD680]"></div>
+            <div className="h-16 flex items-center justify-center">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-vfc-green"></div>
             </div>
           ) : userCrops.length > 0 ? (
-            <div className="flex overflow-x-auto gap-3 pt-1 pb-4 snap-x scrollbar-hide">
+            <div className="flex overflow-x-auto gap-3 pt-1 pb-1 snap-x scrollbar-hide">
               <Link
                 href="/farmer/crops/select"
-                className="flex flex-col items-center gap-1.5 shrink-0 snap-start w-[54px] group"
+                className="flex flex-col items-center gap-1.5 shrink-0 snap-start w-[52px] group"
               >
-                <div className="w-[50px] h-[50px] rounded-full bg-white/5 border border-dashed border-white/30 flex items-center justify-center transition-colors group-hover:bg-white/10">
-                  <Plus className="text-white/50" size={20} />
+                <div className="w-[48px] h-[48px] rounded-full bg-white/80 border border-dashed border-vfc-green/30 flex items-center justify-center transition-all group-hover:bg-white group-hover:border-vfc-green/60 shadow-xs">
+                  <Plus className="text-vfc-green/70 group-hover:text-vfc-green transition-colors" size={18} />
                 </div>
+                <span className="text-[10px] font-medium text-center text-vfc-green/70 leading-tight">
+                  Thêm
+                </span>
               </Link>
               {userCrops.map((crop) => (
                 <div
                   key={crop.id}
-                  className="flex flex-col items-center gap-1.5 shrink-0 snap-start w-[54px]"
+                  className="flex flex-col items-center gap-1.5 shrink-0 snap-start w-[52px]"
                 >
-                  <div className="relative w-[50px] h-[50px]">
-                    <div className="w-full h-full rounded-full overflow-hidden ring-1 ring-[#FFD680]">
-                      <Image
-                        src={crop.imageUrl || getCropImagePath(crop.cropCode)}
-                        alt={crop.name}
-                        fill
-                        className="object-cover"
-                      />
-                    </div>
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full">
-                      <span className="block text-[7px] font-bold text-center text-white leading-tight break-words px-1.5">
-                        {crop.name}
-                      </span>
-                    </div>
+                  <div className="relative w-[48px] h-[48px] rounded-full overflow-hidden ring-1 ring-vfc-green/20 bg-white shadow-xs">
+                    <Image
+                      src={crop.imageUrl || getCropImagePath(crop.cropCode, crop.name)}
+                      alt={crop.name}
+                      fill
+                      className="object-cover"
+                    />
                   </div>
+                  <span className="text-[10px] font-semibold text-center text-vfc-green leading-tight truncate w-full px-0.5">
+                    {crop.name}
+                  </span>
                 </div>
               ))}
             </div>
           ) : (
             <Link
               href="/farmer/crops/select"
-              className="w-full p-2 mb-4 bg-[#FFD680] text-[#0C4A3F] text-sm font-black rounded-lg text-center transition-all active:scale-[0.98] uppercase shadow-lg"
+              className="w-full py-2.5 bg-vfc-green text-white text-xs font-bold rounded-xl text-center transition-all hover:bg-emerald-900 active:scale-[0.98] uppercase tracking-wider block shadow-sm"
             >
               Thêm loại cây trồng
             </Link>

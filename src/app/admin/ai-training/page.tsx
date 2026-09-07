@@ -58,7 +58,7 @@ function MultiSelectDropdown({
           type="button"
           disabled={disabled}
           onClick={() => setOpen((o) => !o)}
-          className="flex w-full items-center justify-between gap-2 rounded-md border border-gray-300 px-3 py-2 text-left text-sm focus:border-[#064E3B] focus:outline-none focus:ring-1 focus:ring-[#064E3B] disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400"
+          className="flex w-full items-center justify-between gap-2 rounded-md border border-gray-300 px-3 py-2 text-left text-sm focus:border-vfc-green focus:outline-none focus:ring-1 focus:ring-vfc-green disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400"
         >
           <span className={`truncate ${selected.length === 0 ? "text-gray-400" : "text-gray-900"}`}>
             {displayText}
@@ -96,7 +96,7 @@ function MultiSelectDropdown({
                     type="checkbox"
                     checked={selected.includes(opt)}
                     onChange={() => toggle(opt)}
-                    className="h-4 w-4 rounded border-gray-300 text-[#064E3B] focus:ring-[#064E3B]"
+                    className="h-4 w-4 rounded border-gray-300 text-vfc-green focus:ring-vfc-green"
                   />
                   <span className="text-gray-700">{opt}</span>
                 </label>
@@ -471,19 +471,19 @@ export default function AITrainingPage() {
           <button
             onClick={handleExport}
             disabled={exporting}
-            className="rounded-lg border border-[#064E3B] px-4 py-2 text-sm font-semibold text-[#064E3B] shadow-sm hover:bg-[#064E3B]/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#064E3B] disabled:opacity-50"
+            className="rounded-lg border border-vfc-green px-4 py-2 text-sm font-semibold text-vfc-green shadow-sm hover:bg-vfc-green/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vfc-green disabled:opacity-50"
           >
             {exporting ? "Đang xuất..." : "📥 Xuất CSV"}
           </button>
           <button
             onClick={handleOpenImport}
-            className="rounded-lg border border-[#064E3B] px-4 py-2 text-sm font-semibold text-[#064E3B] shadow-sm hover:bg-[#064E3B]/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#064E3B]"
+            className="rounded-lg border border-vfc-green px-4 py-2 text-sm font-semibold text-vfc-green shadow-sm hover:bg-vfc-green/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vfc-green"
           >
             Import CSV
           </button>
           <button
             onClick={handleOpenCreateModal}
-            className="rounded-lg bg-[#064E3B] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#064E3B]/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#064E3B]"
+            className="rounded-lg bg-vfc-green px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-vfc-green/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vfc-green"
           >
             + Thêm bản ghi
           </button>
@@ -502,7 +502,7 @@ export default function AITrainingPage() {
                 setFilterSeverity([]);
                 setPage(1);
               }}
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[#064E3B] focus:outline-none focus:ring-1 focus:ring-[#064E3B]"
+              className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-vfc-green focus:outline-none focus:ring-1 focus:ring-vfc-green"
             >
               <option value="">-- Chọn cây trồng --</option>
               {crops.map((c) => (
@@ -656,7 +656,7 @@ export default function AITrainingPage() {
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button onClick={() => handleOpenEditModal(item)} className="text-[#064E3B] hover:text-[#064E3B]/80 mr-4">Sửa</button>
+                        <button onClick={() => handleOpenEditModal(item)} className="text-vfc-green hover:text-vfc-green/80 mr-4">Sửa</button>
                         <button onClick={() => handleDelete(item.id)} className="text-red-600 hover:text-red-900">Xóa</button>
                       </td>
                     </tr>
@@ -729,7 +729,7 @@ export default function AITrainingPage() {
                         severityLevel: "",
                       });
                     }}
-                    className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[#064E3B] focus:outline-none focus:ring-1 focus:ring-[#064E3B]"
+                    className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-vfc-green focus:outline-none focus:ring-1 focus:ring-vfc-green"
                   >
                     <option value="">-- Chọn cây trồng --</option>
                     {crops.map((c) => (
@@ -743,7 +743,7 @@ export default function AITrainingPage() {
                     required
                     value={formData.growthStage}
                     onChange={(e) => setFormData({ ...formData, growthStage: e.target.value })}
-                    className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[#064E3B] focus:outline-none focus:ring-1 focus:ring-[#064E3B]"
+                    className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-vfc-green focus:outline-none focus:ring-1 focus:ring-vfc-green"
                     disabled={!formData.cropType}
                   >
                     <option value="">-- Chọn giai đoạn --</option>
@@ -761,7 +761,7 @@ export default function AITrainingPage() {
                     required
                     value={formData.pestDisease}
                     onChange={(e) => setFormData({ ...formData, pestDisease: e.target.value })}
-                    className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[#064E3B] focus:outline-none focus:ring-1 focus:ring-[#064E3B]"
+                    className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-vfc-green focus:outline-none focus:ring-1 focus:ring-vfc-green"
                     disabled={!formData.cropType}
                   >
                     <option value="">-- Chọn dịch hại --</option>
@@ -776,7 +776,7 @@ export default function AITrainingPage() {
                     required
                     value={formData.severityLevel}
                     onChange={(e) => setFormData({ ...formData, severityLevel: e.target.value })}
-                    className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[#064E3B] focus:outline-none focus:ring-1 focus:ring-[#064E3B]"
+                    className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-vfc-green focus:outline-none focus:ring-1 focus:ring-vfc-green"
                     disabled={!formData.cropType}
                   >
                     <option value="">-- Chọn cấp độ --</option>
@@ -795,7 +795,7 @@ export default function AITrainingPage() {
                   placeholder="VD: Thán thư, Sâu cuốn lá"
                   value={formData.detail}
                   onChange={(e) => setFormData({ ...formData, detail: e.target.value })}
-                  className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[#064E3B] focus:outline-none focus:ring-1 focus:ring-[#064E3B]"
+                  className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-vfc-green focus:outline-none focus:ring-1 focus:ring-vfc-green"
                 />
               </div>
 
@@ -805,7 +805,7 @@ export default function AITrainingPage() {
                   rows={2}
                   value={formData.imageUrls}
                   onChange={(e) => setFormData({ ...formData, imageUrls: e.target.value })}
-                  className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[#064E3B] focus:outline-none focus:ring-1 focus:ring-[#064E3B]"
+                  className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-vfc-green focus:outline-none focus:ring-1 focus:ring-vfc-green"
                   placeholder="https://example.com/image1.jpg&#10;https://example.com/image2.jpg"
                 />
               </div>
@@ -816,7 +816,7 @@ export default function AITrainingPage() {
                   rows={3}
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[#064E3B] focus:outline-none focus:ring-1 focus:ring-[#064E3B]"
+                  className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-vfc-green focus:outline-none focus:ring-1 focus:ring-vfc-green"
                 />
               </div>
 
@@ -826,7 +826,7 @@ export default function AITrainingPage() {
                   rows={2}
                   value={formData.vfcSolution}
                   onChange={(e) => setFormData({ ...formData, vfcSolution: e.target.value })}
-                  className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[#064E3B] focus:outline-none focus:ring-1 focus:ring-[#064E3B]"
+                  className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-vfc-green focus:outline-none focus:ring-1 focus:ring-vfc-green"
                 />
               </div>
 
@@ -837,7 +837,7 @@ export default function AITrainingPage() {
                     type="text"
                     value={formData.actionThreshold}
                     onChange={(e) => setFormData({ ...formData, actionThreshold: e.target.value })}
-                    className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[#064E3B] focus:outline-none focus:ring-1 focus:ring-[#064E3B]"
+                    className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-vfc-green focus:outline-none focus:ring-1 focus:ring-vfc-green"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
@@ -846,7 +846,7 @@ export default function AITrainingPage() {
                     type="text"
                     value={formData.pestDensity}
                     onChange={(e) => setFormData({ ...formData, pestDensity: e.target.value })}
-                    className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[#064E3B] focus:outline-none focus:ring-1 focus:ring-[#064E3B]"
+                    className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-vfc-green focus:outline-none focus:ring-1 focus:ring-vfc-green"
                   />
                 </div>
               </div>
@@ -861,7 +861,7 @@ export default function AITrainingPage() {
                 </button>
                 <button
                   type="submit"
-                  className="rounded-md bg-[#064E3B] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[#064E3B]/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#064E3B]"
+                  className="rounded-md bg-vfc-green px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-vfc-green/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vfc-green"
                 >
                   {selectedRecord ? "Lưu thay đổi" : "Thêm mới"}
                 </button>
@@ -895,7 +895,7 @@ export default function AITrainingPage() {
                   type="file"
                   accept=".csv,text/csv"
                   onChange={(e) => setImportFile(e.target.files?.[0] ?? null)}
-                  className="block w-full text-sm text-gray-700 file:mr-3 file:rounded-md file:border-0 file:bg-[#064E3B] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-[#064E3B]/90"
+                  className="block w-full text-sm text-gray-700 file:mr-3 file:rounded-md file:border-0 file:bg-vfc-green file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-vfc-green/90"
                 />
                 <p className="text-xs text-gray-500">
                   Cột theo thứ tự: Cây, Giai đoạn, Dịch hại, Chi tiết, Cấp độ, Hình ảnh (1 URL hoặc nhiều URL cách nhau bởi dấu phẩy trong ngoặc vuông: <code>[url1, url2]</code>), Thông tin mô tả,
@@ -917,7 +917,7 @@ export default function AITrainingPage() {
                       link.click();
                       URL.revokeObjectURL(link.href);
                     }}
-                    className="text-[#064E3B] underline hover:text-[#064E3B]/80 font-medium"
+                    className="text-vfc-green underline hover:text-vfc-green/80 font-medium"
                   >
                     Tải file mẫu
                   </button>
@@ -933,7 +933,7 @@ export default function AITrainingPage() {
                     value="skip"
                     checked={importMode === "skip"}
                     onChange={() => setImportMode("skip")}
-                    className="mt-1 h-4 w-4 text-[#064E3B] focus:ring-[#064E3B]"
+                    className="mt-1 h-4 w-4 text-vfc-green focus:ring-vfc-green"
                   />
                   <span>
                     <span className="block text-sm font-medium text-gray-900">Bỏ qua trùng lặp</span>
@@ -950,7 +950,7 @@ export default function AITrainingPage() {
                     value="override"
                     checked={importMode === "override"}
                     onChange={() => setImportMode("override")}
-                    className="mt-1 h-4 w-4 text-[#064E3B] focus:ring-[#064E3B]"
+                    className="mt-1 h-4 w-4 text-vfc-green focus:ring-vfc-green"
                   />
                   <span>
                     <span className="block text-sm font-medium text-red-600">Ghi đè toàn bộ</span>
@@ -974,7 +974,7 @@ export default function AITrainingPage() {
                   type="button"
                   onClick={handleImport}
                   disabled={importing || !importFile}
-                  className="rounded-md bg-[#064E3B] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[#064E3B]/90 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-md bg-vfc-green px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-vfc-green/90 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {importing ? "Đang import..." : "Bắt đầu import"}
                 </button>

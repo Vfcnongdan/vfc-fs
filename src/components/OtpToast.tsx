@@ -28,7 +28,7 @@ export function OtpToast({ otp, type, onAutofill, onClose }: OtpToastProps) {
             onAutofill?.();
           }
         }}
-        className="group relative overflow-hidden rounded-2xl bg-[#1C2421]/95 backdrop-blur-xl border border-white/20 p-3.5 shadow-[0_12px_36px_rgba(0,0,0,0.6),0_0_15px_rgba(255,214,128,0.15)] text-white cursor-pointer hover:border-[#FFD680]/50 active:scale-[0.99] transition-all select-none"
+        className="group relative overflow-hidden rounded-2xl bg-[#1C2421]/95 backdrop-blur-xl border border-white/20 p-3.5 shadow-[0_12px_36px_rgba(0,0,0,0.6),0_0_15px_rgba(255,214,128,0.15)] text-white cursor-pointer hover:border-vfc-gold/50 active:scale-[0.99] transition-all select-none"
       >
         {/* Top App Header (iOS / Android System Notification style) */}
         <div className="flex items-center justify-between gap-2 mb-2">
@@ -83,7 +83,7 @@ export function OtpToast({ otp, type, onAutofill, onClose }: OtpToastProps) {
           <div className="flex-1 min-w-0">
             <p className="text-[13px] text-white font-medium leading-snug">
               Mã xác thực của bạn là:{' '}
-              <span className="inline-block font-mono font-black text-[#FFD680] text-base tracking-widest px-2 py-0.5 bg-black/40 rounded-md border border-[#FFD680]/30 shadow-inner ml-1">
+              <span className="inline-block font-mono font-black text-vfc-gold text-base tracking-widest px-2 py-0.5 bg-black/40 rounded-md border border-vfc-gold/30 shadow-inner ml-1">
                 {otp}
               </span>
             </p>
@@ -100,7 +100,7 @@ export function OtpToast({ otp, type, onAutofill, onClose }: OtpToastProps) {
                 e.stopPropagation();
                 onAutofill();
               }}
-              className="shrink-0 px-3 py-1.5 bg-[#FFD680] hover:bg-[#ffe09e] text-[#0C4A3F] font-bold text-xs rounded-full shadow-sm group-hover:brightness-105 active:scale-95 transition tracking-tight"
+              className="shrink-0 px-3 py-1.5 bg-vfc-gold hover:bg-[#ffe09e] text-[#0C4A3F] font-bold text-xs rounded-full shadow-sm group-hover:brightness-105 active:scale-95 transition tracking-tight"
             >
               Điền mã
             </button>

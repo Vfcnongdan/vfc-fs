@@ -112,28 +112,14 @@ export function WeatherBadge() {
       style={{ maxWidth: "calc(100vw - 32px)", width: "min(640px, 100%)" }}
     >
       <div
-        className="relative flex items-center gap-3 rounded-2xl px-4 py-2.5 shadow-2xl border border-white/20 overflow-hidden"
-        style={{
-          background: "linear-gradient(135deg, rgba(6,78,59,0.95) 0%, rgba(4,55,42,0.97) 100%)",
-          backdropFilter: "blur(16px)",
-          WebkitBackdropFilter: "blur(16px)",
-        }}
+        className="relative flex items-center gap-3 rounded-2xl px-4 py-2.5 shadow-md border border-vfc-green/15 overflow-hidden bg-vfc-mint"
       >
-        {/* Subtle glow */}
-        <div
-          className="pointer-events-none absolute inset-0 rounded-2xl"
-          style={{
-            background:
-              "radial-gradient(ellipse at 20% 50%, rgba(255,214,128,0.08) 0%, transparent 60%)",
-          }}
-        />
-
         {loading ? (
           <div className="flex items-center gap-3 w-full">
-            <div className="w-8 h-8 rounded-full bg-white/10 animate-pulse" />
+            <div className="w-8 h-8 rounded-full bg-vfc-green/10 animate-pulse" />
             <div className="flex-1 space-y-1.5">
-              <div className="h-3 w-24 rounded bg-white/10 animate-pulse" />
-              <div className="h-2 w-16 rounded bg-white/10 animate-pulse" />
+              <div className="h-3 w-24 rounded bg-vfc-green/10 animate-pulse" />
+              <div className="h-2 w-16 rounded bg-vfc-green/10 animate-pulse" />
             </div>
           </div>
         ) : weather && info ? (
@@ -141,20 +127,20 @@ export function WeatherBadge() {
             {/* Icon + temp */}
             <div className="flex items-center gap-2 shrink-0">
               <span className="text-2xl leading-none">{info.icon}</span>
-              <span className="text-2xl font-black text-white leading-none">
+              <span className="text-2xl font-black text-vfc-green leading-none">
                 {weather.temperature}°
               </span>
             </div>
 
             {/* Divider */}
-            <div className="w-px h-8 bg-white/20 shrink-0" />
+            <div className="w-px h-8 bg-vfc-green/20 shrink-0" />
 
             {/* Details */}
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-bold text-[#FFD680] truncate leading-tight">
+              <p className="text-xs font-bold text-vfc-green truncate leading-tight">
                 {city}
               </p>
-              <p className="text-[10px] text-white/60 leading-tight mt-0.5">
+              <p className="text-[10px] text-vfc-green/70 leading-tight mt-0.5">
                 {info.label} · 💧{weather.humidity}% · 🌬️{weather.windspeed} km/h
               </p>
             </div>
@@ -162,7 +148,7 @@ export function WeatherBadge() {
             {/* Close */}
             <button
               onClick={() => setVisible(false)}
-              className="shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-white/40 hover:text-white/80 hover:bg-white/10 transition-colors text-xs leading-none"
+              className="shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-neutral-500 hover:text-neutral-800 hover:bg-black/5 transition-colors text-xs leading-none"
               aria-label="Đóng thời tiết"
             >
               ×

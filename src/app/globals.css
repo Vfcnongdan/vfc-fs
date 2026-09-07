@@ -2,6 +2,9 @@
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --color-vfc-green: #064E3B;
+  --color-vfc-mint: #E5F0E5;
+  --color-vfc-gold: #FFD680;
 }
 
 :root {

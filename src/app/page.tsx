@@ -70,23 +70,36 @@ function LoginContent() {
 
   // Auto-redirect if already logged in + load last phone
   useEffect(() => {
+    let cancelled = false;
+    const safetyTimer = setTimeout(() => {
+      // Nếu checkSession treo quá 5s (network chậm / cold start), tự tắt overlay
+      if (!cancelled) setCheckingSession(false);
+    }, 5000);
+
     async function checkSession() {
       try {
         const res = await getMe();
+        if (cancelled) return;
         if (res.success) {
           router.push(redirectTo);
-          router.refresh();
           return;
         }
       } catch {
         // Not logged in
       }
 
-      setCheckingSession(false);
-      const lastPhone = localStorage.getItem("lastPhone");
-      if (lastPhone) setPhone(lastPhone);
+      if (!cancelled) {
+        setCheckingSession(false);
+        const lastPhone = localStorage.getItem("lastPhone");
+        if (lastPhone) setPhone(lastPhone);
+      }
     }
     checkSession();
+
+    return () => {
+      cancelled = true;
+      clearTimeout(safetyTimer);
+    };
   }, [router, redirectTo]);
 
   // Khi nhận được OTP qua SSE: Chuyển sang bước nhập OTP (nếu chưa chuyển), không tự động điền hay submit
@@ -288,18 +301,18 @@ function LoginContent() {
                   <div className="relative flex items-center">
                     <input
                       type="checkbox"
-                      className="w-5 h-5 rounded border-white/30 bg-transparent accent-[#FFD680] cursor-pointer shadow-inner"
+                      className="w-5 h-5 rounded border-white/30 bg-transparent accent-vfc-gold cursor-pointer shadow-inner"
                       checked={agreed}
                       onChange={(e) => setAgreed(e.target.checked)}
                     />
                   </div>
                   <span className="text-white text-[11px] leading-relaxed">
                     Bạn đã đồng ý với{" "}
-                    <a href="/terms" target="_blank" className="text-[#FFD680] font-bold underline underline-offset-2">
+                    <a href="/terms" target="_blank" className="text-vfc-gold font-bold underline underline-offset-2">
                       Điều Khoản &amp; Điều Kiện
                     </a>{" "}
                     và{" "}
-                    <a href="/privacy" target="_blank" className="text-[#FFD680] font-bold underline underline-offset-2">
+                    <a href="/privacy" target="_blank" className="text-vfc-gold font-bold underline underline-offset-2">
                       Chính sách quyền riêng tư
                     </a>
                   </span>
@@ -315,7 +328,7 @@ function LoginContent() {
               <button
                 type="submit"
                 disabled={loading || !agreed}
-                className="w-full py-4 mt-6 bg-[#FFD680] text-[#0C4A3F] text-lg font-black rounded-full shadow-[0_4px_20px_rgba(0,0,0,0.3)] transition-all hover:brightness-105 active:scale-95 disabled:opacity-50 disabled:grayscale uppercase tracking-widest"
+                className="w-full py-4 mt-6 bg-vfc-gold text-[#0C4A3F] text-lg font-black rounded-full shadow-[0_4px_20px_rgba(0,0,0,0.3)] transition-all hover:brightness-105 active:scale-95 disabled:opacity-50 disabled:grayscale uppercase tracking-widest"
               >
                 {loading ? "ĐANG GỬI..." : "ĐĂNG NHẬP"}
               </button>
@@ -335,7 +348,7 @@ function LoginContent() {
                   type="text"
                   inputMode="numeric"
                   maxLength={1}
-                  className="w-16 h-16 bg-gray-300 rounded-sm text-center text-3xl font-bold text-gray-800 outline-none focus:ring-2 focus:ring-[#FFD680]"
+                  className="w-16 h-16 bg-gray-300 rounded-sm text-center text-3xl font-bold text-gray-800 outline-none focus:ring-2 focus:ring-vfc-gold"
                   value={digit}
                   onChange={(e) => handleOtpChange(index, e.target.value)}
                   onKeyDown={(e) => handleKeyDown(index, e)}

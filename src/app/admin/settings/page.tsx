@@ -178,7 +178,7 @@ export default function AdminSettingsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-neutral-200 pb-6">
         <div>
           <h1 className="text-2xl sm:text-3xl font-black text-neutral-900 tracking-tight flex items-center gap-3">
-            <span className="p-2.5 bg-[#064E3B]/10 rounded-2xl text-[#064E3B] text-2xl">⚙️</span>
+            <span className="p-2.5 bg-vfc-green/10 rounded-2xl text-vfc-green text-2xl">⚙️</span>
             Cài đặt Hệ thống
           </h1>
           <p className="mt-1 text-sm text-neutral-500 font-medium">
@@ -193,7 +193,7 @@ export default function AdminSettingsPage() {
           onClick={() => setActiveTab("zalo")}
           className={`flex items-center gap-2 px-5 py-3 text-sm font-bold border-b-2 transition-all ${
             activeTab === "zalo"
-              ? "border-[#064E3B] text-[#064E3B] bg-[#064E3B]/5 rounded-t-xl"
+              ? "border-vfc-green text-vfc-green bg-vfc-green/5 rounded-t-xl"
               : "border-transparent text-neutral-500 hover:text-neutral-900"
           }`}
         >
@@ -204,7 +204,7 @@ export default function AdminSettingsPage() {
           onClick={() => setActiveTab("general")}
           className={`flex items-center gap-2 px-5 py-3 text-sm font-bold border-b-2 transition-all ${
             activeTab === "general"
-              ? "border-[#064E3B] text-[#064E3B] bg-[#064E3B]/5 rounded-t-xl"
+              ? "border-vfc-green text-vfc-green bg-vfc-green/5 rounded-t-xl"
               : "border-transparent text-neutral-500 hover:text-neutral-900"
           }`}
         >
@@ -275,7 +275,7 @@ export default function AdminSettingsPage() {
                     type="button"
                     disabled={refreshingToken}
                     onClick={handleForceRefresh}
-                    className="flex items-center gap-2 px-4 py-2 bg-[#064E3B] hover:bg-[#064E3B]/90 text-white text-xs font-bold rounded-xl shadow-sm transition disabled:opacity-50"
+                    className="flex items-center gap-2 px-4 py-2 bg-vfc-green hover:bg-vfc-green/90 text-white text-xs font-bold rounded-xl shadow-sm transition disabled:opacity-50"
                     title="Chủ động đổi lấy cặp Access Token + Refresh Token mới ngay lập tức"
                   >
                     {refreshingToken ? (
@@ -298,7 +298,7 @@ export default function AdminSettingsPage() {
                       disabled={toggling}
                       onClick={() => handleToggleEnable(!status.enabled)}
                       className={`relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                        status.enabled ? "bg-[#064E3B]" : "bg-neutral-300"
+                        status.enabled ? "bg-vfc-green" : "bg-neutral-300"
                       }`}
                     >
                       <span
@@ -438,7 +438,7 @@ export default function AdminSettingsPage() {
                     value={accessTokenInput}
                     onChange={(e) => setAccessTokenInput(e.target.value)}
                     placeholder="Dán Access Token tại đây..."
-                    className="w-full px-4 py-3 bg-white border border-neutral-300 rounded-xl text-sm font-mono focus:ring-2 focus:ring-[#064E3B] focus:border-[#064E3B] outline-none transition"
+                    className="w-full px-4 py-3 bg-white border border-neutral-300 rounded-xl text-sm font-mono focus:ring-2 focus:ring-vfc-green focus:border-vfc-green outline-none transition"
                   />
                 </div>
 
@@ -452,7 +452,7 @@ export default function AdminSettingsPage() {
                     value={refreshTokenInput}
                     onChange={(e) => setRefreshTokenInput(e.target.value)}
                     placeholder="Dán Refresh Token tại đây..."
-                    className="w-full px-4 py-3 bg-white border border-neutral-300 rounded-xl text-sm font-mono focus:ring-2 focus:ring-[#064E3B] focus:border-[#064E3B] outline-none transition"
+                    className="w-full px-4 py-3 bg-white border border-neutral-300 rounded-xl text-sm font-mono focus:ring-2 focus:ring-vfc-green focus:border-vfc-green outline-none transition"
                   />
                 </div>
 
@@ -460,7 +460,7 @@ export default function AdminSettingsPage() {
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="flex items-center gap-2 px-6 py-3 bg-[#064E3B] text-white text-sm font-bold rounded-xl hover:bg-[#064E3B]/90 focus:ring-4 focus:ring-[#064E3B]/20 transition-all disabled:opacity-50 shadow-sm"
+                    className="flex items-center gap-2 px-6 py-3 bg-vfc-green text-white text-sm font-bold rounded-xl hover:bg-vfc-green/90 focus:ring-4 focus:ring-vfc-green/20 transition-all disabled:opacity-50 shadow-sm"
                   >
                     {submitting ? (
                       <>
@@ -479,7 +479,7 @@ export default function AdminSettingsPage() {
                     href="https://developers.zalo.me"
                     target="_blank"
                     rel="noreferrer"
-                    className="text-xs font-bold text-[#064E3B] hover:underline"
+                    className="text-xs font-bold text-vfc-green hover:underline"
                   >
                     Zalo Developer Console ↗
                   </a>

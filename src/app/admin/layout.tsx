@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { LogoutButton } from "@/components/LogoutButton";
 import { NotificationBell } from "@/components/NotificationBell";
+import { removeStoredToken } from "@/lib/auth-client";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -20,6 +21,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     fetch("/api/auth/me")
       .then((res) => {
         if (res.status === 401) {
+          removeStoredToken(); // Xóa token cũ khỏi localStorage trước khi redirect
           window.location.href = "/";
         }
         return res.json();
@@ -99,13 +101,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   };
 
   const sidebarContent = (
-    <aside className={`flex h-full flex-col bg-[#064E3B] shadow-2xl transition-all duration-300 ${isSidebarOpen ? "w-64" : "w-0 sm:w-64 overflow-hidden"}`}>
+    <aside className={`flex h-full flex-col bg-vfc-green shadow-2xl transition-all duration-300 ${isSidebarOpen ? "w-64" : "w-0 sm:w-64 overflow-hidden"}`}>
       <div className="flex items-center gap-2 px-6 py-8 min-w-[256px]">
         <Link href="/farmer" className="transition hover:opacity-80">
           <Image src="/assets/images/logo.svg" alt="VFC Logo" width={80} height={40} className="h-8 w-auto" />
         </Link>
         <div className="flex flex-col">
-          <span className="text-[10px] font-black text-[#FFD680] tracking-[0.2em] leading-none uppercase">Admin</span>
+          <span className="text-[10px] font-black text-vfc-gold tracking-[0.2em] leading-none uppercase">Admin</span>
           <span className="text-[8px] font-bold text-white/50 tracking-wider uppercase">Portal</span>
         </div>
       </div>
@@ -134,7 +136,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="mt-4 pt-4 border-t border-white/10">
           <Link
             href="/farmer"
-            className="flex items-center gap-3 rounded-xl px-4 py-3 text-[#FFD680] hover:bg-[#FFD680]/10 transition-all font-bold border border-[#FFD680]/20"
+            className="flex items-center gap-3 rounded-xl px-4 py-3 text-vfc-gold hover:bg-vfc-gold/10 transition-all font-bold border border-vfc-gold/20"
           >
             <span className="text-base">🏠</span>
             <span className="tracking-tight">Quay lại Farmer</span>
@@ -146,7 +148,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="flex items-center justify-between px-2 mb-4">
           <div className="flex flex-col">
             <span className="text-[10px] font-bold text-white/40 uppercase">Hỗ trợ</span>
-            <span className="text-[11px] font-black text-[#FFD680] tracking-tight">IT Helpdesk</span>
+            <span className="text-[11px] font-black text-vfc-gold tracking-tight">IT Helpdesk</span>
           </div>
           <LogoutButton />
         </div>
@@ -176,7 +178,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       <div className="flex flex-1 flex-col">
         {/* Mobile Header */}
-        <header className="flex items-center justify-between bg-[#064E3B] px-3 py-2 sm:hidden shadow-md gap-2">
+        <header className="flex items-center justify-between bg-vfc-green px-3 py-2 sm:hidden shadow-md gap-2">
           <div className="flex items-center gap-1.5 flex-shrink-0">
             <button 
               onClick={() => setIsSidebarOpen(true)}
@@ -256,7 +258,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                       href={app.href}
                       className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs transition-all ${
                         isActive
-                          ? "bg-[#064E3B] text-white shadow-sm ring-1 ring-black/5 font-bold"
+                          ? "bg-vfc-green text-white shadow-sm ring-1 ring-black/5 font-bold"
                           : "text-neutral-600 hover:text-neutral-900 hover:bg-white/80 font-medium"
                       }`}
                     >

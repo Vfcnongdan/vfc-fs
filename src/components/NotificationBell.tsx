@@ -80,7 +80,7 @@ export function NotificationBell({ dark = false }: { dark?: boolean }) {
         onClick={() => setOpen((v) => !v)}
         className={`relative inline-flex h-8 w-8 items-center justify-center rounded-full border transition ${
           dark
-            ? "border-white/20 bg-white/10 text-white hover:bg-white/15"
+            ? "border-black/10 bg-transparent text-black/70 hover:text-vfc-green hover:bg-black/5"
             : "border-neutral-200 bg-white text-neutral-700 shadow-sm hover:bg-neutral-50"
         }`}
       >

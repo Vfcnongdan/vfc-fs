@@ -253,7 +253,11 @@ export async function getMe(): Promise<{ success: boolean; user?: any }> {
   // Fallback: Legacy Next.js route
   try {
     const res = await fetch('/api/auth/me');
-    if (!res.ok) return { success: false };
+    if (!res.ok) {
+      // Server trả 401 → session đã bị revoke, xóa localStorage token để đồng bộ
+      removeStoredToken();
+      return { success: false };
+    }
     const data = await res.json();
     return { success: true, user: data.user };
   } catch {

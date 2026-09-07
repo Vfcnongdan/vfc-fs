@@ -312,7 +312,7 @@ export default function MembersPage() {
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
             className={`flex items-center gap-2 px-4 py-3 text-sm font-bold border-b-2 transition-all whitespace-nowrap ${activeTab === tab.key
-              ? "border-[#064E3B] text-[#064E3B] bg-[#064E3B]/5 rounded-t-xl"
+              ? "border-vfc-green text-vfc-green bg-vfc-green/5 rounded-t-xl"
               : "border-transparent text-neutral-500 hover:text-neutral-900"
               }`}
           >
@@ -332,7 +332,7 @@ export default function MembersPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={`Tìm kiếm ${tabConfig.label}...`}
-              className="w-full pl-10 pr-4 py-2.5 bg-white border border-neutral-300 rounded-xl text-sm focus:ring-2 focus:ring-[#064E3B] focus:border-[#064E3B] outline-none transition"
+              className="w-full pl-10 pr-4 py-2.5 bg-white border border-neutral-300 rounded-xl text-sm focus:ring-2 focus:ring-vfc-green focus:border-vfc-green outline-none transition"
             />
             {search && (
               <button
@@ -354,7 +354,7 @@ export default function MembersPage() {
         </div>
         <button
           onClick={openCreate}
-          className="flex items-center justify-center self-start gap-2 px-5 py-2.5 bg-[#064E3B] text-white text-sm font-bold rounded-xl hover:bg-[#064E3B]/90 transition-all shadow-sm whitespace-nowrap"
+          className="flex items-center justify-center self-start gap-2 px-5 py-2.5 bg-vfc-green text-white text-sm font-bold rounded-xl hover:bg-vfc-green/90 transition-all shadow-sm whitespace-nowrap"
         >
           <span>＋</span>
           <span>Thêm {tabConfig.label}</span>
@@ -388,7 +388,7 @@ export default function MembersPage() {
                 <tr>
                   <td colSpan={tabConfig.columns.length + 2} className="px-4 py-16 text-center">
                     <div className="flex flex-col items-center gap-3 text-neutral-400">
-                      <span className="w-6 h-6 border-2 border-neutral-300 border-t-[#064E3B] rounded-full animate-spin" />
+                      <span className="w-6 h-6 border-2 border-neutral-300 border-t-vfc-green rounded-full animate-spin" />
                       <span className="text-sm font-medium">Đang tải...</span>
                     </div>
                   </td>
@@ -462,7 +462,7 @@ export default function MembersPage() {
                   key={p}
                   onClick={() => setPage(p)}
                   className={`px-2.5 py-1.5 text-xs font-bold rounded-lg border transition ${p === page
-                    ? "bg-[#064E3B] text-white border-[#064E3B]"
+                    ? "bg-vfc-green text-white border-vfc-green"
                     : "border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50"
                     }`}
                 >
@@ -521,7 +521,7 @@ export default function MembersPage() {
                     placeholder={field.placeholder}
                     value={formData[field.key] || ""}
                     onChange={(e) => setFormData((prev) => ({ ...prev, [field.key]: e.target.value }))}
-                    className="w-full px-4 py-2.5 bg-white border border-neutral-300 rounded-xl text-sm focus:ring-2 focus:ring-[#064E3B] focus:border-[#064E3B] outline-none transition"
+                    className="w-full px-4 py-2.5 bg-white border border-neutral-300 rounded-xl text-sm focus:ring-2 focus:ring-vfc-green focus:border-vfc-green outline-none transition"
                   />
                 </div>
               ))}
@@ -538,7 +538,7 @@ export default function MembersPage() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-[#064E3B] text-white text-sm font-bold rounded-xl hover:bg-[#064E3B]/90 transition-all disabled:opacity-50 shadow-sm"
+                  className="flex items-center gap-2 px-5 py-2.5 bg-vfc-green text-white text-sm font-bold rounded-xl hover:bg-vfc-green/90 transition-all disabled:opacity-50 shadow-sm"
                 >
                   {submitting ? (
                     <>

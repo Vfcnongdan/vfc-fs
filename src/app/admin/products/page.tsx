@@ -165,12 +165,12 @@ export default function AdminProductsPage() {
       {/* Page Title & Add Button */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-black text-[#064E3B] uppercase tracking-tight">📦 Quản lý Sản phẩm</h1>
+          <h1 className="text-2xl font-black text-vfc-green uppercase tracking-tight">📦 Quản lý Sản phẩm</h1>
           <p className="text-sm text-neutral-500">Danh mục thuốc bảo vệ thực vật, phân bón & kỹ thuật VFC</p>
         </div>
         <button
           onClick={openCreateModal}
-          className="flex items-center gap-2 rounded-xl bg-[#064E3B] px-5 py-2.5 text-sm font-bold text-[#FFD680] shadow-lg transition hover:opacity-90 active:scale-95"
+          className="flex items-center gap-2 rounded-xl bg-vfc-green px-5 py-2.5 text-sm font-bold text-vfc-gold shadow-lg transition hover:opacity-90 active:scale-95"
         >
           <Plus size={18} />
           <span>Thêm sản phẩm</span>
@@ -298,11 +298,11 @@ export default function AdminProductsPage() {
       {/* Modal CRUD với TAB CHIA RÕ RÀNG */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-          <div className="fixed inset-0 bg-[#064E3B]/40 backdrop-blur-sm" onClick={() => setIsModalOpen(false)} />
+          <div className="fixed inset-0 bg-vfc-green/40 backdrop-blur-sm" onClick={() => setIsModalOpen(false)} />
           <div className="relative w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl animate-in zoom-in-95 duration-200 overflow-y-auto max-h-[90vh] flex flex-col">
             {/* Modal Header & Close */}
             <div className="flex items-center justify-between border-b border-neutral-100 pb-4 mb-4">
-              <h2 className="text-lg font-black text-[#064E3B] uppercase tracking-tight">
+              <h2 className="text-lg font-black text-vfc-green uppercase tracking-tight">
                 {editingProduct?.id ? "📝 Cập nhật sản phẩm" : "✨ Thêm sản phẩm mới"}
               </h2>
               <button onClick={() => setIsModalOpen(false)} className="text-neutral-400 hover:text-neutral-600 transition">
@@ -316,7 +316,7 @@ export default function AdminProductsPage() {
                 type="button"
                 onClick={() => setActiveTab("basic")}
                 className={`flex items-center gap-2 px-5 py-2.5 text-xs font-bold transition-all border-b-2 ${activeTab === "basic"
-                    ? "border-[#064E3B] text-[#064E3B] bg-emerald-50/50"
+                    ? "border-vfc-green text-vfc-green bg-emerald-50/50"
                     : "border-transparent text-neutral-400 hover:text-neutral-600"
                   }`}
               >
@@ -327,7 +327,7 @@ export default function AdminProductsPage() {
                 type="button"
                 onClick={() => setActiveTab("detail")}
                 className={`flex items-center gap-2 px-5 py-2.5 text-xs font-bold transition-all border-b-2 ${activeTab === "detail"
-                    ? "border-[#064E3B] text-[#064E3B] bg-emerald-50/50"
+                    ? "border-vfc-green text-vfc-green bg-emerald-50/50"
                     : "border-transparent text-neutral-400 hover:text-neutral-600"
                   }`}
               >
@@ -359,7 +359,7 @@ export default function AdminProductsPage() {
                         )
                       }
                       placeholder="VD: Michelle 62EC"
-                      className="w-full rounded-xl border border-neutral-200 px-4 py-2.5 text-sm focus:border-[#064E3B] focus:ring-1 focus:ring-[#064E3B] outline-none"
+                      className="w-full rounded-xl border border-neutral-200 px-4 py-2.5 text-sm focus:border-vfc-green focus:ring-1 focus:ring-vfc-green outline-none"
                     />
                   </div>
 
@@ -633,7 +633,7 @@ export default function AdminProductsPage() {
                   </button>
                   <button
                     type="submit"
-                    className="px-6 py-2 rounded-xl bg-[#064E3B] text-[#FFD680] text-xs font-bold shadow-md shadow-[#064E3B]/20 transition-all active:scale-95 hover:opacity-95"
+                    className="px-6 py-2 rounded-xl bg-vfc-green text-vfc-gold text-xs font-bold shadow-md shadow-vfc-green/20 transition-all active:scale-95 hover:opacity-95"
                   >
                     Lưu thay đổi
                   </button>

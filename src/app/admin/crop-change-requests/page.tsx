@@ -143,7 +143,7 @@ export default function CropChangeRequestsPage() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-black text-[#064E3B] uppercase tracking-tight">🌱 Duyệt cây trồng</h1>
+          <h1 className="text-2xl font-black text-vfc-green uppercase tracking-tight">🌱 Duyệt cây trồng</h1>
           <p className="text-sm text-neutral-500">
             Yêu cầu thay đổi danh sách cây trồng của nông dân
             {pendingCount > 0 && (
@@ -178,7 +178,7 @@ export default function CropChangeRequestsPage() {
               }}
               className={`rounded-lg px-4 py-2 text-xs font-bold transition ${
                 filterStatus === item.value
-                  ? "bg-[#064E3B] text-[#FFD680] shadow-sm"
+                  ? "bg-vfc-green text-vfc-gold shadow-sm"
                   : "text-neutral-600 hover:bg-neutral-50"
               }`}
             >
@@ -209,7 +209,7 @@ export default function CropChangeRequestsPage() {
                   key={req.id}
                   ref={(el) => { itemRefs.current[req.id] = el; }}
                   className={`transition ${
-                    isFocused ? "ring-2 ring-[#064E3B] ring-offset-2" : ""
+                    isFocused ? "ring-2 ring-vfc-green ring-offset-2" : ""
                   }`}
                 >
                   <div

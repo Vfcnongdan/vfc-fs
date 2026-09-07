@@ -84,8 +84,8 @@ function AdminOrdersContent() {
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-3">
-            <ShoppingCart size={28} className="text-[#064E3B]" />
-            <h1 className="text-2xl font-black text-[#064E3B] uppercase tracking-tight">Quản lý đơn hàng</h1>
+            <ShoppingCart size={28} className="text-vfc-green" />
+            <h1 className="text-2xl font-black text-vfc-green uppercase tracking-tight">Quản lý đơn hàng</h1>
           </div>
           <p className="text-sm text-neutral-500 mt-1">Danh sách đơn hàng B2C từ nông dân</p>
         </div>
@@ -118,7 +118,7 @@ function AdminOrdersContent() {
                 id={`order-${order.id}`}
                 className={`group rounded-xl border bg-white p-4 transition-all ${
                   isHighlighted
-                    ? "border-[#064E3B] shadow-lg ring-2 ring-[#064E3B]/20"
+                    ? "border-vfc-green shadow-lg ring-2 ring-vfc-green/20"
                     : "border-neutral-200 hover:shadow-md"
                 }`}
               >
@@ -193,7 +193,7 @@ function AdminOrdersContent() {
                       </div>
                       {canEdit ? (
                         <select
-                          className="rounded-lg border border-neutral-200 bg-white px-3 py-2 text-xs font-medium outline-none transition focus:border-[#064E3B] focus:ring-2 focus:ring-[#064E3B]/10"
+                          className="rounded-lg border border-neutral-200 bg-white px-3 py-2 text-xs font-medium outline-none transition focus:border-vfc-green focus:ring-2 focus:ring-vfc-green/10"
                           value={order.status}
                           onChange={(e) => updateStatus(order.id, e.target.value)}
                         >
