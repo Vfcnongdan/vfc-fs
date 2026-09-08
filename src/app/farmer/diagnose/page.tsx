@@ -1021,28 +1021,32 @@ export default function DiagnosePage() {
                     </div>
 
                     <p className="text-sm text-neutral-700 leading-relaxed mb-4">
-                      Thông tin dịch hại trên cây trồng bạn đưa không chính xác.
-                      Tuy nhiên, hệ thống đã nhận diện được cây trong ảnh và cung cấp một số thông tin tham khảo bên dưới.
+                      Hình ảnh gửi lên không khớp với loại cây bạn đã chọn.
+                      Hệ thống đã nhận diện được cây trong ảnh và cung cấp thông tin tham khảo bên dưới.
                     </p>
 
                     {result.plantInfo && (
                       <div className="rounded-xl border border-amber-200 bg-white/90 overflow-hidden mb-4">
                         <div className="border-b border-amber-100 bg-amber-50/50 px-4 py-2.5">
                           <p className="text-xs font-bold uppercase tracking-wider text-amber-700">
-                            📋 Thông tin tham khảo về cây
+                            📋 Thông tin nhận diện
                           </p>
                         </div>
                         <div className="flex flex-col gap-0 divide-y divide-neutral-100">
                           {result.plantInfo
                             .split("\n")
                             .filter((line) => line.trim())
-                            .map((line, i) => (
-                              <div key={i} className="px-4 py-2.5">
-                                <p className="text-sm text-neutral-700 leading-relaxed">
-                                  {line.trim()}
-                                </p>
-                              </div>
-                            ))}
+                            .map((line, i) => {
+                              const trimmed = line.trim();
+                              const isEmoji = /^[\u{1F300}-\u{1FAD6}]/u.test(trimmed);
+                              return (
+                                <div key={i} className={`px-4 py-2.5 ${isEmoji ? "bg-amber-50/30" : ""}`}>
+                                  <p className={`text-sm leading-relaxed ${isEmoji ? "font-medium text-neutral-800" : "text-neutral-700"}`}>
+                                    {trimmed}
+                                  </p>
+                                </div>
+                              );
+                            })}
                         </div>
                       </div>
                     )}
