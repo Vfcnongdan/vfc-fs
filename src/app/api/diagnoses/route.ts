@@ -184,7 +184,7 @@ async function legacyCreateDiagnosis(request: NextRequest, user: any) {
         data: {
           rawAiResponse: validationResult as Prisma.JsonObject,
           summary: validationResult.userGuidance,
-          status: DiagnosisStatus.DONE,
+          status: DiagnosisStatus.FAILED,
         },
       });
       logger.info(

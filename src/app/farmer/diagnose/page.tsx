@@ -639,8 +639,14 @@ export default function DiagnosePage() {
     for (let i = 0; i < 45; i++) {
       await new Promise((r) => setTimeout(r, 2000));
       const res = await fetch(`/api/diagnoses/${id}`);
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       console.log("[Diagnose Poll Response]", data);
+
+      if (!res.ok) {
+        throw new Error(
+          data.error || "Không thể kết nối đến máy chủ chẩn đoán. Vui lòng thử lại."
+        );
+      }
 
       if (data.wrongCrop) {
         setResult(data);
@@ -675,6 +681,10 @@ export default function DiagnosePage() {
 
       setResult(data);
     }
+
+    throw new Error(
+      "AI cần thêm thời gian xử lý hơn dự kiến. Bạn vui lòng kiểm tra lại trong lịch sử chẩn đoán nhé."
+    );
   }
 
   return (
@@ -979,8 +989,45 @@ export default function DiagnosePage() {
               )}
 
               {result.status === "FAILED" && (
-                <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium leading-relaxed text-red-700">
-                  {result.summary || NEED_CLEARER_IMAGE_MESSAGE}
+                <div className="flex flex-col gap-4 animate-fade-in">
+                  {diagnosisImagePreview && (
+                    <div className="overflow-hidden rounded-2xl border border-red-200 bg-red-50/40 shadow-sm">
+                      <div className="border-b border-red-200 px-4 py-2">
+                        <p className="text-xs font-bold uppercase tracking-wider text-red-700">
+                          Ảnh đã gửi
+                        </p>
+                      </div>
+                      <div className="bg-white p-2">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={diagnosisImagePreview}
+                          alt="Ảnh cây trồng đã gửi"
+                          className="h-56 w-full rounded-xl object-cover sm:h-72"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="rounded-2xl border border-red-200 bg-gradient-to-br from-red-50/90 to-orange-50/40 p-4 sm:p-5 shadow-sm">
+                    <div className="flex items-center gap-2.5 mb-3">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-100 text-lg">
+                        ⚠️
+                      </span>
+                      <div>
+                        <h3 className="text-base font-bold text-red-800">
+                          Không thể hoàn tất chẩn đoán
+                        </h3>
+                        <p className="text-xs text-neutral-500 mt-0.5">
+                          Hình ảnh gửi lên chưa đáp ứng yêu cầu nhận diện bệnh cây
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-sm font-medium text-red-700 leading-relaxed">
+                      {result.summary || NEED_CLEARER_IMAGE_MESSAGE}
+                    </p>
+                  </div>
+
+                  <ExpertContactBanner />
                 </div>
               )}
 
