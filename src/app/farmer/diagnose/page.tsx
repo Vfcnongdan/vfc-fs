@@ -8,7 +8,7 @@ import {
   Search,
   Share2,
   Sprout,
-  UploadCloud,
+  X,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { captureElementToPng } from "@/lib/shareDiagnosis";
@@ -115,8 +115,12 @@ function ExpertContactBanner() {
 }
 
 export default function DiagnosePage() {
-  const fileRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+  const cropSelectRef = useRef<HTMLSelectElement>(null);
   const belowContentRef = useRef<HTMLDivElement>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [showMediaPicker, setShowMediaPicker] = useState(false);
   const [previews, setPreviews] = useState<string[]>([]);
   const [cropType, setCropType] = useState("");
   const { userCrops, fetchUserCrops } = useCropStore();
@@ -408,7 +412,12 @@ export default function DiagnosePage() {
   }
 
   useEffect(() => {
-    fetchUserCrops();
+    fetchUserCrops().then(() => {
+      const crops = useCropStore.getState().userCrops;
+      if (crops.length === 1) {
+        setCropType((prev) => prev || crops[0].name);
+      }
+    });
     fetch("/api/auth/me")
       .then((r) => r.json())
       .then((d) => {
@@ -422,6 +431,24 @@ export default function DiagnosePage() {
       previews.forEach((preview) => URL.revokeObjectURL(preview));
     };
   }, [previews]);
+
+  const triggerCamera = () => {
+    if (!cropType) {
+      toast.error("Vui lòng chọn loại cây trồng trước khi chụp ảnh");
+      cropSelectRef.current?.focus();
+      return;
+    }
+    cameraInputRef.current?.click();
+  };
+
+  const triggerGallery = () => {
+    if (!cropType) {
+      toast.error("Vui lòng chọn loại cây trồng trước khi chọn ảnh");
+      cropSelectRef.current?.focus();
+      return;
+    }
+    galleryInputRef.current?.click();
+  };
 
   // Kiểm tra trạng thái block từ localStorage mỗi giây
   useEffect(() => {
@@ -503,13 +530,19 @@ export default function DiagnosePage() {
     if (!files || files.length === 0) return;
     // Only take the first image
     const file = files[0];
+    setSelectedFile(file);
     const url = URL.createObjectURL(file);
     setPreviews([url]);
+    setShowMediaPicker(false);
+    setError("");
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!fileRef.current?.files?.length) return;
+    if (!selectedFile) {
+      setError("Vui lòng chụp hoặc chọn ảnh cây trồng trước khi phân tích");
+      return;
+    }
     if (!cropType) {
       setError("Vui lòng chọn loại cây trồng trước khi phân tích");
       return;
@@ -557,7 +590,7 @@ export default function DiagnosePage() {
     setStageConfirmCountdown(30);
 
     // Cache base64 ảnh để gửi lại nếu cần chọn stage thủ công
-    const file = fileRef.current.files[0];
+    const file = selectedFile;
     const arrayBuffer = await file.arrayBuffer();
     const b64 = btoa(
       new Uint8Array(arrayBuffer).reduce((d, b) => d + String.fromCharCode(b), "")
@@ -741,13 +774,16 @@ export default function DiagnosePage() {
                 Cây trồng
               </label>
               <select
+                ref={cropSelectRef}
                 value={cropType}
                 onChange={(e) => {
                   setCropType(e.target.value);
                   setPreviews([]);
+                  setSelectedFile(null);
                   setResult(null);
                   setAwaitingStage(null);
-                  if (fileRef.current) fileRef.current.value = "";
+                  if (cameraInputRef.current) cameraInputRef.current.value = "";
+                  if (galleryInputRef.current) galleryInputRef.current.value = "";
                 }}
                 className="input-field"
               >
@@ -775,59 +811,136 @@ export default function DiagnosePage() {
                 </span>
               </div>
               <div
-                onClick={() => cropType && fileRef.current?.click()}
-                className={`group flex min-h-48 flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed p-4 text-center transition ${!cropType
-                    ? "cursor-not-allowed border-neutral-200 bg-neutral-50 opacity-70"
-                    : "cursor-pointer border-green-300 bg-green-50/60 hover:border-green-500 hover:bg-green-50"
-                  }`}
+                onClick={() => {
+                  if (!cropType) {
+                    toast.error("Vui lòng chọn loại cây trồng trước khi chụp hoặc chọn ảnh");
+                    cropSelectRef.current?.focus();
+                    return;
+                  }
+                  setShowMediaPicker(true);
+                }}
+                className={`group flex min-h-52 flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed p-4 text-center transition ${
+                  !cropType
+                    ? "cursor-pointer border-neutral-200 bg-neutral-50 opacity-80"
+                    : "cursor-pointer border-green-300 bg-green-50/50 hover:border-green-500 hover:bg-green-50"
+                }`}
               >
                 {previews.length > 0 ? (
-                  <div className="flex w-full flex-col items-center gap-3">
-                    {previews.map((p, i) => (
-                      // eslint-disable-next-line @next/next/no-img-element
+                  <div className="flex w-full flex-col items-center gap-3" onClick={(e) => e.stopPropagation()}>
+                    <div className="relative w-full max-w-sm">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
-                        key={i}
-                        src={p}
+                        src={previews[0]}
                         alt="Ảnh cây trồng đã chọn"
-                        className="h-36 w-full max-w-sm rounded-xl object-cover shadow-sm ring-1 ring-neutral-200"
+                        className="h-48 w-full rounded-xl object-cover shadow-sm ring-1 ring-neutral-200"
                       />
-                    ))}
-                    <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-green-700 shadow-sm ring-1 ring-green-100">
-                      <UploadCloud className="h-3.5 w-3.5" aria-hidden="true" />
-                      Nhấn để đổi ảnh
-                    </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPreviews([]);
+                          setSelectedFile(null);
+                          if (cameraInputRef.current) cameraInputRef.current.value = "";
+                          if (galleryInputRef.current) galleryInputRef.current.value = "";
+                        }}
+                        className="absolute top-2 right-2 rounded-full bg-black/60 p-1.5 text-white hover:bg-black/80 transition shadow"
+                        title="Xóa ảnh"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-center gap-2">
+                      <button
+                        type="button"
+                        onClick={triggerCamera}
+                        className="inline-flex items-center gap-1.5 rounded-full bg-green-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-green-700 active:scale-95 transition"
+                      >
+                        <Camera className="h-3.5 w-3.5" />
+                        Chụp lại
+                      </button>
+                      <button
+                        type="button"
+                        onClick={triggerGallery}
+                        className="inline-flex items-center gap-1.5 rounded-full bg-white px-3.5 py-1.5 text-xs font-bold text-neutral-700 shadow-sm ring-1 ring-neutral-200 hover:bg-neutral-50 active:scale-95 transition"
+                      >
+                        <ImagePlus className="h-3.5 w-3.5 text-blue-600" />
+                        Chọn ảnh khác
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <>
                     <span
-                      className={`flex h-14 w-14 items-center justify-center rounded-2xl ${cropType
+                      className={`flex h-14 w-14 items-center justify-center rounded-2xl ${
+                        cropType
                           ? "bg-white text-green-600 shadow-sm"
                           : "bg-neutral-100 text-neutral-400"
+                      }`}
+                    >
+                      <Camera className="h-7 w-7" aria-hidden="true" />
+                    </span>
+                    <div>
+                      <span
+                        className={`text-sm font-bold ${
+                          !cropType ? "text-neutral-400" : "text-green-900"
                         }`}
+                      >
+                        {cropType
+                          ? "Chụp ảnh trực tiếp hoặc chọn từ thư viện"
+                          : "Vui lòng chọn cây trồng trước"}
+                      </span>
+                      <p className="max-w-sm text-xs leading-relaxed text-neutral-500 mt-1">
+                        Chụp rõ phần lá, thân, hoa hoặc quả đang có dấu hiệu bất thường.
+                      </p>
+                    </div>
+
+                    {/* Phím bấm nhanh 1 chạm trực tiếp trên card */}
+                    <div
+                      className="mt-1 flex w-full max-w-xs items-center justify-center gap-2.5"
+                      onClick={(e) => e.stopPropagation()}
                     >
-                      <ImagePlus className="h-7 w-7" aria-hidden="true" />
-                    </span>
-                    <span
-                      className={`text-sm font-semibold ${!cropType ? "text-neutral-400" : "text-green-800"}`}
-                    >
-                      {cropType
-                        ? "Nhấn để chụp hoặc chọn ảnh cây"
-                        : "Vui lòng chọn cây trồng trước"}
-                    </span>
-                    <span className="max-w-sm text-xs leading-relaxed text-neutral-400">
-                      Nên chụp rõ phần lá, thân, hoa hoặc trái đang có dấu
-                      hiệu bất thường.
-                    </span>
+                      <button
+                        type="button"
+                        onClick={triggerCamera}
+                        className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-green-600 py-2.5 px-3 text-xs font-bold text-white shadow-sm hover:bg-green-700 active:scale-95 transition"
+                      >
+                        <Camera className="h-4 w-4" />
+                        Máy ảnh
+                      </button>
+                      <button
+                        type="button"
+                        onClick={triggerGallery}
+                        className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-white py-2.5 px-3 text-xs font-bold text-neutral-700 shadow-sm ring-1 ring-neutral-200 hover:bg-neutral-50 active:scale-95 transition"
+                      >
+                        <ImagePlus className="h-4 w-4 text-blue-600" />
+                        Thư viện
+                      </button>
+                    </div>
                   </>
                 )}
               </div>
             </div>
+
+            {/* Inputs ẩn chuẩn W3C cho mobile Camera & Thư viện ảnh */}
             <input
-              ref={fileRef}
+              ref={cameraInputRef}
               type="file"
-              accept="image/jpeg, image/png, image/webp"
+              accept="image/*"
+              capture="environment"
               className="hidden"
-              onChange={(e) => handleFiles(e.target.files)}
+              onChange={(e) => {
+                handleFiles(e.target.files);
+                e.target.value = "";
+              }}
+            />
+            <input
+              ref={galleryInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                handleFiles(e.target.files);
+                e.target.value = "";
+              }}
             />
 
             {error && (
@@ -839,7 +952,7 @@ export default function DiagnosePage() {
             <button
               type="submit"
               className="btn-primary relative w-full overflow-hidden py-3 text-base"
-              disabled={loading || !previews.length}
+              disabled={loading || !selectedFile}
             >
               {loading && (
                 <span
@@ -1517,6 +1630,73 @@ export default function DiagnosePage() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Media Picker Action Sheet / Bottom Sheet Modal */}
+      {showMediaPicker && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs p-0 sm:p-4"
+          onClick={() => setShowMediaPicker(false)}
+        >
+          <div
+            className="w-full max-w-md bg-white rounded-t-3xl sm:rounded-2xl p-5 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-neutral-300 sm:hidden" />
+            <div className="mb-4 text-center">
+              <h3 className="text-base font-bold text-neutral-800">
+                Chọn ảnh chẩn đoán
+              </h3>
+              <p className="text-xs text-neutral-500 mt-0.5">
+                Chọn cách cung cấp ảnh cây bị bệnh để AI phân tích
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMediaPicker(false);
+                  triggerCamera();
+                }}
+                className="flex items-center gap-3.5 p-3.5 rounded-2xl border-2 border-green-200 bg-green-50/60 hover:bg-green-100/80 active:scale-[0.98] transition text-left group"
+              >
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-green-600 text-white shadow-sm group-hover:scale-105 transition-transform">
+                  <Camera className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="font-bold text-sm text-green-950">Chụp ảnh bằng máy ảnh</p>
+                  <p className="text-xs text-green-700/90 mt-0.5">Mở trực tiếp máy ảnh để chụp mẫu bệnh</p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMediaPicker(false);
+                  triggerGallery();
+                }}
+                className="flex items-center gap-3.5 p-3.5 rounded-2xl border-2 border-neutral-200 bg-neutral-50 hover:bg-neutral-100 active:scale-[0.98] transition text-left group"
+              >
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm group-hover:scale-105 transition-transform">
+                  <ImagePlus className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="font-bold text-sm text-neutral-900">Chọn từ thư viện ảnh</p>
+                  <p className="text-xs text-neutral-500 mt-0.5">Mở album ảnh có sẵn trong thiết bị</p>
+                </div>
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowMediaPicker(false)}
+              className="mt-3.5 w-full py-2.5 text-center text-sm font-semibold text-neutral-500 hover:text-neutral-700 active:bg-neutral-100 rounded-xl transition"
+            >
+              Hủy
+            </button>
           </div>
         </div>
       )}
