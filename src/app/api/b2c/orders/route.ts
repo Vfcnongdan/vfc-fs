@@ -8,7 +8,7 @@ import {
 } from "@/lib/b2cOrder";
 import { notifyOrderCreated } from "@/lib/notifications";
 import { getRequestUser, apiError, apiOk } from "@/lib/request";
-import { Role } from "@prisma/client";
+import { OrderStatus, Prisma, Role } from "@prisma/client";
 
 const createSchema = z.object({
   agencyId: z.string().min(1),
@@ -31,7 +31,7 @@ const createSchema = z.object({
     .optional(),
 });
 
-function listWhereForRole(user: { id: string; role: Role }) {
+function listWhereForRole(user: { id: string; role: Role }): Prisma.B2cOrderWhereInput {
   if (user.role === Role.FARMER) return { buyerId: user.id };
   if (user.role === Role.AGENCY || user.role === Role.SUPER_AGENT) {
     return { sellerId: user.id };
@@ -46,21 +46,100 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = request.nextUrl;
   const page = Math.max(1, Number(searchParams.get("page") ?? 1));
-  const limit = Math.min(50, Math.max(1, Number(searchParams.get("limit") ?? 20)));
-  const where = listWhereForRole(user);
+  const limit = Math.min(100, Math.max(1, Number(searchParams.get("limit") ?? 20)));
+  const roleWhere = listWhereForRole(user);
+  const where: Prisma.B2cOrderWhereInput = { ...roleWhere };
 
-  const [total, orders] = await Promise.all([
+  // 1. Status filter
+  const statusParam = searchParams.get("status")?.trim().toUpperCase();
+  if (statusParam && statusParam !== "ALL") {
+    if (Object.values(OrderStatus).includes(statusParam as OrderStatus)) {
+      where.status = statusParam as OrderStatus;
+    }
+  }
+
+  // 2. Search keyword (orderNumber, buyer, seller, agency, product)
+  const search = searchParams.get("search")?.trim();
+  if (search) {
+    where.OR = [
+      { orderNumber: { contains: search, mode: "insensitive" } },
+      { buyer: { name: { contains: search, mode: "insensitive" } } },
+      { buyer: { phone: { contains: search } } },
+      { seller: { name: { contains: search, mode: "insensitive" } } },
+      { seller: { agency: { name: { contains: search, mode: "insensitive" } } } },
+      { seller: { agency: { code: { contains: search, mode: "insensitive" } } } },
+      { items: { some: { product: { name: { contains: search, mode: "insensitive" } } } } },
+    ];
+  }
+
+  // 3. Date range filter
+  const startDate = searchParams.get("startDate")?.trim();
+  const endDate = searchParams.get("endDate")?.trim();
+  if (startDate || endDate) {
+    const createdAtFilter: Prisma.DateTimeFilter = {};
+    if (startDate) {
+      const start = new Date(startDate);
+      if (!isNaN(start.getTime())) {
+        start.setHours(0, 0, 0, 0);
+        createdAtFilter.gte = start;
+      }
+    }
+    if (endDate) {
+      const end = new Date(endDate);
+      if (!isNaN(end.getTime())) {
+        end.setHours(23, 59, 59, 999);
+        createdAtFilter.lte = end;
+      }
+    }
+    if (createdAtFilter.gte || createdAtFilter.lte) {
+      where.createdAt = createdAtFilter;
+    }
+  }
+
+  // 4. Sorting
+  const sort = searchParams.get("sort")?.trim() === "oldest" ? "asc" : "desc";
+
+  // Base where for status counts (without status filter)
+  const countWhere: Prisma.B2cOrderWhereInput = { ...where };
+  delete countWhere.status;
+
+  const [total, orders, statusGroups] = await Promise.all([
     prisma.b2cOrder.count({ where }),
     prisma.b2cOrder.findMany({
       where,
       include: b2cOrderListInclude,
-      orderBy: { createdAt: "desc" },
+      orderBy: { createdAt: sort },
       skip: (page - 1) * limit,
       take: limit,
     }),
+    prisma.b2cOrder.groupBy({
+      by: ["status"],
+      where: countWhere,
+      _count: { status: true },
+    }),
   ]);
 
-  return apiOk({ data: orders, total, page, limit });
+  const counts: Record<string, number> = {
+    ALL: 0,
+    PENDING: 0,
+    CONFIRMED: 0,
+    SHIPPING: 0,
+    DELIVERED: 0,
+    CANCELLED: 0,
+  };
+
+  for (const group of statusGroups) {
+    counts[group.status] = group._count.status;
+    counts.ALL += group._count.status;
+  }
+
+  return apiOk({
+    data: orders,
+    total,
+    page,
+    limit,
+    statusCounts: counts,
+  });
 }
 
 // POST /api/b2c/orders — nông dân đặt hàng qua đại lý cấp 2

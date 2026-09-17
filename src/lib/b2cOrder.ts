@@ -10,7 +10,14 @@ export const b2cOrderListInclude = {
     },
   },
   buyer: { select: { id: true, phone: true, name: true } },
-  seller: { select: { id: true, phone: true, name: true } },
+  seller: {
+    select: {
+      id: true,
+      phone: true,
+      name: true,
+      agency: { select: { id: true, name: true, code: true } },
+    },
+  },
 } satisfies Prisma.B2cOrderInclude;
 
 export const b2cOrderDetailInclude = {

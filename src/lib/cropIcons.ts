@@ -53,6 +53,18 @@ const CROP_ICON_MAP: Record<string, string> = {
   CAY_RAU_AN_TRAI: "/assets/images/plant-icons/rau-an-trai.png",
   RAU_AN_TRAI: "/assets/images/plant-icons/rau-an-trai.png",
   BAU_BI_DUA: "/assets/images/plant-icons/rau-an-trai.png",
+  CAY_RAU_AN_HOA: "/assets/images/plant-icons/rau-an-hoa.png",
+  RAU_AN_HOA: "/assets/images/plant-icons/rau-an-hoa.png",
+  RAU_HOA: "/assets/images/plant-icons/rau-an-hoa.png",
+  CAY_RAU_HOA: "/assets/images/plant-icons/rau-an-hoa.png",
+  SUP_LO: "/assets/images/plant-icons/rau-an-hoa.png",
+  CAY_SUP_LO: "/assets/images/plant-icons/rau-an-hoa.png",
+  BONG_CAI: "/assets/images/plant-icons/rau-an-hoa.png",
+  CAY_BONG_CAI: "/assets/images/plant-icons/rau-an-hoa.png",
+  BROCCOLI: "/assets/images/plant-icons/rau-an-hoa.png",
+  CAULIFLOWER: "/assets/images/plant-icons/rau-an-hoa.png",
+  ATISO: "/assets/images/plant-icons/rau-an-hoa.png",
+  HOA_THIEN_LY: "/assets/images/plant-icons/rau-an-hoa.png",
 
   // Cải xanh -> rau-an-la
   CAI_XANH: "/assets/images/plant-icons/rau-an-la.png",
@@ -260,6 +272,20 @@ export function getCropImagePath(cropCode?: string | null, cropName?: string | n
   // Cải xanh -> rau-an-la.png
   if (combined.includes("CAI_XANH")) {
     return "/assets/images/plant-icons/rau-an-la.png";
+  }
+
+  // Rau ăn hoa / Súp lơ / Bông cải -> rau-an-hoa.png
+  if (
+    combined.includes("RAU_AN_HOA") ||
+    combined.includes("RAU_HOA") ||
+    combined.includes("SUP_LO") ||
+    combined.includes("BONG_CAI") ||
+    combined.includes("BROCCOLI") ||
+    combined.includes("CAULIFLOWER") ||
+    combined.includes("ATISO") ||
+    combined.includes("HOA_THIEN_LY")
+  ) {
+    return "/assets/images/plant-icons/rau-an-hoa.png";
   }
 
   // Nhãn -> nhan.png
