@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { includesStr } from "@/lib/utils";
 import { logger } from "@/lib/logger";
+import { matchProductAdvanced } from "./productMatcher";
 
 /**
  * In-memory cache danh sách sản phẩm active cho AI Diagnosis.
@@ -34,18 +35,20 @@ async function load(): Promise<DiagnosisProduct[]> {
 export async function getDiagnosisProducts(): Promise<DiagnosisProduct[]> {
   return load();
 }
-
 /**
- * Tìm sản phẩm theo tên AI trả về (fuzzy match: includesStr 2 chiều).
+ * Tìm sản phẩm theo tên AI trả về với thuật toán đa tầng:
+ * 1. Exact match / includesStr 2 chiều
+ * 2. Tra từ điển Alias & lỗi chính tả/nồng độ
+ * 3. Làm sạch từ nhiễu (bằng, trên lá, dưới rễ...)
+ * 4. Khớp theo Core Brand
+ * 5. Fuzzy match (Levenshtein distance)
  * Trả về product đầu tiên khớp, hoặc undefined.
  */
 export async function findProductByAiName(
   aiName: string
 ): Promise<DiagnosisProduct | undefined> {
   const products = await load();
-  return products.find(
-    (p) => includesStr(p.name, aiName) || includesStr(aiName, p.name)
-  );
+  return matchProductAdvanced(aiName, products);
 }
 
 /** Xóa cache in-memory. Lần gọi tiếp sẽ query lại DB. */
