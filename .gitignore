@@ -32,3 +32,4 @@ public/uploads/
 .env*
 !.env.example
 docs/production_readiness_100k_users.md
+bk/
