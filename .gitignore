@@ -33,3 +33,6 @@ public/uploads/
 !.env.example
 docs/production_readiness_100k_users.md
 bk/
+
+# Sentry Config File
+.env.sentry-build-plugin
