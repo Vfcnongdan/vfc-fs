@@ -7,10 +7,12 @@ import { Camera, Package, MapPin, Plus } from "lucide-react";
 import { getCropImagePath } from "@/lib/cropIcons";
 import { useCropStore } from "@/store/useCropStore";
 import { WeatherBadge } from "@/components/WeatherBadge";
-import { removeStoredToken } from "@/lib/auth-client";
+import { getMe, removeStoredToken } from "@/lib/auth-client";
+
+const MAP_ALLOWED_ROLES = ["MDM", "BGD", "ASM", "TSM", "ADMIN", "CV_CM"];
 
 export default function FarmerHomePage() {
-  const [user, setUser] = useState<{ name: string | null } | null>(null);
+  const [user, setUser] = useState<{ name: string | null; role?: string | null } | null>(null);
   const { userCrops, fetchUserCrops, isLoading: cropsLoading } = useCropStore();
   const [loadingUser, setLoadingUser] = useState(true);
 
@@ -18,11 +20,10 @@ export default function FarmerHomePage() {
     async function fetchData() {
       try {
         fetchUserCrops();
-        const userRes = await fetch("/api/auth/me");
-        if (userRes.ok) {
-          const userData = await userRes.json();
-          setUser(userData.user);
-        } else if (userRes.status === 401) {
+        const res = await getMe();
+        if (res.success && res.user) {
+          setUser(res.user);
+        } else {
           removeStoredToken(); // Xóa token cũ khỏi localStorage trước khi redirect
           window.location.href = "/";
         }
@@ -34,6 +35,10 @@ export default function FarmerHomePage() {
     }
     fetchData();
   }, [fetchUserCrops]);
+
+  const canViewMap = Boolean(
+    user?.role && MAP_ALLOWED_ROLES.includes(user.role.toUpperCase().trim())
+  );
 
   const loading = loadingUser || cropsLoading;
 
@@ -149,20 +154,22 @@ export default function FarmerHomePage() {
               </span>
             </div>
           </Link>
-          <a
-            href="https://map.vfcnongdan.com/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="card flex flex-col items-center gap-2 p-4 text-center hover:ring-2 hover:ring-blue-400 transition-all bg-white border border-neutral-100 shadow-sm rounded-2xl"
-          >
-            <div className="w-12 h-12 rounded-full bg-orange-50 flex items-center justify-center mb-1">
-              <MapPin className="text-orange-600" size={24} />
-            </div>
-            <div>
-              <span className="font-bold text-sm block">Bản đồ</span>
-              <span className="text-[10px] text-neutral-500">Vùng trồng VFC</span>
-            </div>
-          </a>
+          {canViewMap && (
+            <a
+              href="https://map.vfcnongdan.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="card flex flex-col items-center gap-2 p-4 text-center hover:ring-2 hover:ring-blue-400 transition-all bg-white border border-neutral-100 shadow-sm rounded-2xl"
+            >
+              <div className="w-12 h-12 rounded-full bg-orange-50 flex items-center justify-center mb-1">
+                <MapPin className="text-orange-600" size={24} />
+              </div>
+              <div>
+                <span className="font-bold text-sm block">Bản đồ</span>
+                <span className="text-[10px] text-neutral-500">Vùng trồng VFC</span>
+              </div>
+            </a>
+          )}
         </div>
       </div>
 
