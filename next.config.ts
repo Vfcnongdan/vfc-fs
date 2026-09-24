@@ -24,6 +24,7 @@ export default withSentryConfig(nextConfig, {
   org: "vfc-el",
 
   project: "javascript-nextjs",
+  sentryUrl: "https://de.sentry.io",
 
   // Only print logs for uploading source maps in CI
   silent: !process.env.CI,
