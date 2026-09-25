@@ -9,7 +9,17 @@ Sentry.init({
   environment: process.env.NEXT_PUBLIC_SENTRY_ENVIRONMENT || process.env.NEXT_PUBLIC_VERCEL_ENV || "production",
 
   // Add optional integrations for additional features
-  integrations: [Sentry.replayIntegration()],
+  integrations: [Sentry.replayIntegration({
+    unblock: [".sentry-unblock", "[data-sentry-unblock]"],
+    unmask: [".sentry-unmask", "[data-sentry-unmask]"]
+  })],
+
+  // Ignore harmless noise errors caused by in-app browser script injections
+  ignoreErrors: [
+    "Can't find variable: zaloJSV2",
+    "zaloJSV2 is not defined",
+    /zaloJSV2/i,
+  ],
 
   // Define how likely traces are sampled. Adjust this value in production, or use tracesSampler for greater control.
   tracesSampleRate: 1,
