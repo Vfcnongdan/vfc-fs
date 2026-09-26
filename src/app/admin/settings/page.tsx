@@ -60,6 +60,13 @@ export default function AdminSettingsPage() {
       setMessage({ type: "error", text: "Vui lòng nhập Refresh Token" });
       return;
     }
+    if (accessTokenInput.trim() === refreshTokenInput.trim()) {
+      setMessage({
+        type: "error",
+        text: "Access Token và Refresh Token không được giống nhau! Refresh Token là mã riêng biệt dùng để cấp lại Access Token mới. Vui lòng lấy đúng chuỗi Refresh Token từ Zalo Developer Console.",
+      });
+      return;
+    }
 
     try {
       setSubmitting(true);
@@ -356,6 +363,26 @@ export default function AdminSettingsPage() {
                   </div>
                 </div>
 
+                {/* Duplicate Token Warning (If Access Token === Refresh Token) */}
+                {status.accessTokenMasked &&
+                  status.refreshTokenMasked &&
+                  status.accessTokenMasked === status.refreshTokenMasked && (
+                    <div className="p-4 rounded-2xl border bg-amber-50 border-amber-300 text-amber-900 flex items-start gap-3">
+                      <span className="text-2xl">⚠️</span>
+                      <div className="text-xs space-y-1">
+                        <p className="font-extrabold text-sm text-amber-950">
+                          Phát hiện trùng lặp: Access Token và Refresh Token đang có cùng giá trị trong Database!
+                        </p>
+                        <p className="text-amber-800">
+                          Access Token hiện tại vẫn gửi OTP được (hạn ~25 giờ). Tuy nhiên, khi bấm <strong>&ldquo;Làm mới Token ngay&rdquo;</strong>, Zalo yêu cầu chuỗi <strong>Refresh Token riêng biệt</strong>. Do cả 2 trường đang bị dán cùng Access Token nên Zalo API sẽ từ chối với lỗi <code className="bg-amber-100 px-1 py-0.5 rounded font-mono">-14014 (Invalid refresh token)</code>.
+                        </p>
+                        <p className="font-bold text-amber-950">
+                          👉 Hướng dẫn xử lý: Truy cập <a href="https://developers.zalo.me" target="_blank" rel="noreferrer" className="underline text-blue-700">Zalo Developer Console</a>, sao chép chuỗi <strong>Refresh Token</strong> (khác với Access Token) và dán lại vào ô Refresh Token bên dưới rồi bấm <strong>&ldquo;Lưu Token vào Database&rdquo;</strong>.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                 {/* Refresh Token Expiry Alert Panel */}
                 {(() => {
                   const level = status.refreshTokenAlertLevel;
@@ -423,15 +450,18 @@ export default function AdminSettingsPage() {
                   <span>Nhập Token trực tiếp từ Zalo Developer</span>
                 </h3>
                 <p className="text-xs text-neutral-500 mt-1">
-                  Chỉ cần nhập <code className="bg-white px-1.5 py-0.5 rounded border border-neutral-200 font-bold text-neutral-800">Access Token</code> và <code className="bg-white px-1.5 py-0.5 rounded border border-neutral-200 font-bold text-neutral-800">Refresh Token</code> <strong>lần đầu tiên duy nhất</strong> lấy từ Zalo Developer Console. Sau khi lưu, hệ thống sẽ tự động làm mới mãi mãi.
+                  Nhập cặp <code className="bg-white px-1.5 py-0.5 rounded border border-neutral-200 font-bold text-neutral-800">Access Token</code> và <code className="bg-white px-1.5 py-0.5 rounded border border-neutral-200 font-bold text-neutral-800">Refresh Token</code> lấy từ Zalo Developer Console. Sau khi lưu đúng, nút Làm mới và tiến trình tự động gia hạn sẽ hoạt động trơn tru.
                 </p>
               </div>
 
               <form onSubmit={handleSaveTokens} className="space-y-4">
                 <div>
-                  <label htmlFor="accessToken" className="block text-xs font-bold text-neutral-700 mb-1.5">
-                    Access Token:
-                  </label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label htmlFor="accessToken" className="text-xs font-bold text-neutral-700">
+                      1. Access Token:
+                    </label>
+                    <span className="text-[11px] text-neutral-400 font-medium">Dùng gửi tin nhắn / OTP (hạn ~25h)</span>
+                  </div>
                   <input
                     id="accessToken"
                     type="text"
@@ -443,15 +473,18 @@ export default function AdminSettingsPage() {
                 </div>
 
                 <div>
-                  <label htmlFor="refreshToken" className="block text-xs font-bold text-neutral-700 mb-1.5">
-                    Refresh Token:
-                  </label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label htmlFor="refreshToken" className="text-xs font-bold text-neutral-700">
+                      2. Refresh Token:
+                    </label>
+                    <span className="text-[11px] text-amber-600 font-bold">Khác với Access Token (hạn 90 ngày, dùng để làm mới)</span>
+                  </div>
                   <input
                     id="refreshToken"
                     type="text"
                     value={refreshTokenInput}
                     onChange={(e) => setRefreshTokenInput(e.target.value)}
-                    placeholder="Dán Refresh Token tại đây..."
+                    placeholder="Dán Refresh Token riêng biệt tại đây..."
                     className="w-full px-4 py-3 bg-white border border-neutral-300 rounded-xl text-sm font-mono focus:ring-2 focus:ring-vfc-green focus:border-vfc-green outline-none transition"
                   />
                 </div>

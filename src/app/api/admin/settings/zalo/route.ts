@@ -76,6 +76,13 @@ export async function PUT(request: NextRequest) {
       return apiError("Vui lòng nhập Refresh Token hợp lệ", 400);
     }
 
+    if (accessToken.trim() === refreshToken.trim()) {
+      return apiError(
+        "Access Token và Refresh Token không được giống nhau! Access Token dùng để gửi OTP (hạn 25 giờ), còn Refresh Token là mã riêng biệt dùng để làm mới token (hạn 90 ngày). Vui lòng lấy đúng mã Refresh Token từ Zalo Developer Console.",
+        400
+      );
+    }
+
     // Access Token mặc định 90.000 giây (~25 giờ) theo chuẩn Zalo
     const expiresInSeconds = 90000;
     // Refresh Token Zalo có hạn 90 ngày
