@@ -45,25 +45,37 @@ export function getStoredToken(): string | null {
   return localStorage.getItem(STORAGE_KEYS.TOKEN);
 }
 
-export function setStoredToken(token: string): void {
+/**
+ * Lưu JWT token vào localStorage VÀ set HttpOnly Cookie qua server bridge.
+ *
+ * Vấn đề: JavaScript client-side (document.cookie) không thể ghi đè
+ * cookie `HttpOnly` cũ còn trong trình duyệt của người dùng cũ (RFC 6265).
+ * Giải pháp: Gọi POST /api/auth/session để server tự set cookie qua
+ * HTTP Response Header `Set-Cookie`, vượt qua giới hạn trên.
+ */
+export async function setStoredToken(token: string): Promise<void> {
   if (typeof window === 'undefined') return;
   localStorage.setItem(STORAGE_KEYS.TOKEN, token);
 
-  // Đồng bộ Cookie để Next.js SSR middleware.ts vẫn đọc được khi chuyển trang
-  const isSecure = window.location.protocol === 'https:';
-  document.cookie = `${COOKIE_NAME}=${encodeURIComponent(
-    token,
-  )}; path=/; max-age=${60 * 60 * 24 * 60}; SameSite=Lax${
-    isSecure ? '; Secure' : ''
-  }`;
+  // Gọi bridge route để server set/ghi đè HttpOnly cookie
+  try {
+    await fetch('/api/auth/session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    });
+  } catch {
+    // Không block: nếu fail, middleware vẫn có thể đọc Bearer từ Authorization header
+  }
 }
 
 export function removeStoredToken(): void {
   if (typeof window === 'undefined') return;
   localStorage.removeItem(STORAGE_KEYS.TOKEN);
 
-  // Xóa Cookie
-  document.cookie = `${COOKIE_NAME}=; path=/; max-age=0; SameSite=Lax`;
+  // Gọi server để xóa HttpOnly cookie (JS không thể tự xóa cookie HttpOnly)
+  // Fire-and-forget là ổn vì logout page sẽ redirect sang / ngay sau đó
+  fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
 }
 
 export function getStoredCredential(): StoredBrowserCredential | null {
@@ -182,9 +194,9 @@ export async function verifyOtp(
       };
     }
 
-    // Lưu Token và Browser Credential
+    // Lưu Token và Browser Credential (phải await để cookie được set trước khi redirect)
     if (data.token) {
-      setStoredToken(data.token);
+      await setStoredToken(data.token);
     }
     if (data.browserCredential) {
       saveStoredCredential(data.browserCredential);
@@ -215,6 +227,12 @@ export async function verifyOtp(
       error: data.error || 'VERIFY_FAILED',
       message: data.message || 'Xác thực OTP thất bại.',
     };
+  }
+
+  // Legacy route trả về token trong response JSON (sau khi đã set HttpOnly cookie),
+  // đồng bộ thêm vào localStorage để getMe() và FarmerHeader hoạt động đúng
+  if (data.token) {
+    localStorage.setItem(STORAGE_KEYS.TOKEN, data.token);
   }
 
   return {
@@ -255,7 +273,7 @@ export async function getMe(): Promise<{ success: boolean; user?: any }> {
     const res = await fetch('/api/auth/me');
     if (!res.ok) {
       // Server trả 401 → session đã bị revoke, xóa localStorage token để đồng bộ
-      removeStoredToken();
+      localStorage.removeItem(STORAGE_KEYS.TOKEN);
       return { success: false };
     }
     const data = await res.json();
@@ -280,11 +298,14 @@ export async function logout(): Promise<void> {
         },
       });
     } catch {}
-  } else {
-    try {
-      await fetch('/api/auth/logout', { method: 'POST' });
-    } catch {}
   }
 
-  removeStoredToken();
+  // Luôn gọi /api/auth/logout để server xóa HttpOnly cookie (kể cả khi dùng NestJS)
+  try {
+    await fetch('/api/auth/logout', { method: 'POST' });
+  } catch {}
+
+  // Xóa localStorage (document.cookie không thể xóa HttpOnly cookie)
+  localStorage.removeItem(STORAGE_KEYS.TOKEN);
+  localStorage.removeItem(STORAGE_KEYS.BROWSER_CRED);
 }

@@ -84,9 +84,12 @@ export async function POST(request: NextRequest) {
     const token = await signToken({ sub: user.id, phone: user.phone, role: user.role, sessionId: sessionToken });
 
     const response = NextResponse.json({
+      success: true,
+      token, // Trả về token để client lưu vào localStorage (dùng cho NestJS flow sau này)
       user: { id: user.id, phone: user.phone, role: user.role, name: user.name },
     });
 
+    // Set HttpOnly cookie qua server response (đây là cách duy nhất để migrate từ cookie cũ)
     response.cookies.set(COOKIE_NAME, token, COOKIE_OPTIONS);
     return response;
   } catch (err: any) {

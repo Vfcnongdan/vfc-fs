@@ -9,6 +9,7 @@ const PUBLIC_PATHS = [
   "/api/health",
   "/api/auth/otp/send",
   "/api/auth/otp/verify",
+  "/api/auth/session",  // Bridge route: set HttpOnly cookie sau khi nhận JWT từ vfc-server
   "/api/auth/zalo/callback",
   "/zalo_verifierOyIX99Bk6tXmqSnrjELRVNV3wrIRjJ4FCpap.html",
 ];
@@ -103,7 +104,13 @@ export async function middleware(request: NextRequest) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/";
     loginUrl.searchParams.set("from", pathname);
-    return NextResponse.redirect(loginUrl);
+    const redirectResponse = NextResponse.redirect(loginUrl);
+    // Nếu có cookie nhưng session không hợp lệ (cookie cũ/hết hạn),
+    // xóa ngay để không bị chặn đăng nhập ở lần sau
+    if (token) {
+      redirectResponse.cookies.delete(COOKIE_NAME);
+    }
+    return redirectResponse;
   }
 
   // Check role-based access
