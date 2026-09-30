@@ -168,7 +168,7 @@ function buildImageValidationPrompt(
 
   const severityInfo =
     allowedSeverityLevels.length > 0
-      ? `\nDanh sách mức độ bệnh hợp lệ: ${JSON.stringify(allowedSeverityLevels)}. Hãy đánh giá mức độ bệnh trong ảnh và trả về chính xác một trong các giá trị trên vào trường "detectedSeverityLevel". Nếu không xác định được, trả null.`
+      ? `\nDanh sách mức độ bệnh hợp lệ: ${JSON.stringify(allowedSeverityLevels)}. Hãy đánh giá mức độ bệnh trong ảnh và trả về chính xác một trong các giá trị trên vào trường "detectedSeverityLevel" theo quy tắc LÀM TRÒN LÊN bên dưới. Nếu không xác định được, trả null.`
       : `\nTrả "detectedSeverityLevel": null.`;
 
   return `Bạn là một bộ lọc bảo mật và kiểm định chất lượng hình ảnh đầu vào cho ứng dụng nông nghiệp. Người dùng sẽ tải lên một bức ảnh và cho biết họ đang muốn kiểm tra cây gì (Tham số: target_crop: ${cropType || "không có thông tin"}).
@@ -187,6 +187,15 @@ Hãy phân tích bức ảnh về mặt chi tiết vết bệnh và trả về m
 Quy tắc đánh giá cropConfidence:
 - Chỉ trả cropConfidence >= 0.9 khi nhìn thấy rõ ít nhất 2 đặc điểm nhận diện đặc trưng của cây (hình thái phiến lá đầy đủ, cấu trúc thân/nhánh, hoa, quả, hoặc đọt non).
 - Nếu ảnh chỉ thấy một phần lá, chỉ có đốm bệnh, hoặc không thấy được đặc điểm nhận diện đáng tin cậy, trả cropConfidence thấp (< 0.9).
+
+Quy tắc đánh giá mức độ bệnh (detectedSeverityLevel) - LÀM TRÒN LÊN THEO THỰC TẾ CANH TÁC:
+- Thứ tự mức độ nghiêm trọng tăng dần: "Không có" < "Nhẹ" < "Trung bình" < "Nặng" < "Hết cứu".
+- Trong thực tế canh tác đồng ruộng, khi mắt thường/camera đã thấy rõ triệu chứng vết bệnh hoặc dịch hại trên một bộ phận lá, thân, quả thì áp lực dịch bệnh ngoài đồng ruộng thường đã lây lan nhanh và ở mức cao hơn so với một góc chụp cận cảnh. Nếu đánh giá quá nhẹ sẽ gây tâm lý chủ quan và chậm trễ thời điểm can thiệp thuốc BVTV của bà con nông dân.
+- Do đó, BẮT BUỘC áp dụng nguyên tắc "LÀM TRÒN LÊN" (round up) mức độ nghiêm trọng hơn một bậc:
+  + Nếu thấy triệu chứng vết bệnh (đốm lá, rỉ sắt, thán thư, cháy lá, thối nhũn, biến màu...) hoặc vết cắn phá của sâu bọ rõ ràng nhưng phân vân hoặc ở ngưỡng giữa "Nhẹ" và "Trung bình": BẮT BUỘC LÀM TRÒN LÊN chọn "Trung bình" (không chọn "Nhẹ").
+  + Nếu triệu chứng bắt đầu lan rộng nhiều điểm, đốm lớn, mật độ sâu bệnh dày hoặc ở ngưỡng giữa "Trung bình" và "Nặng": BẮT BUỘC LÀM TRÒN LÊN chọn "Nặng".
+  + Chỉ chọn "Nhẹ" khi tổn thương cực kỳ nhỏ, mờ nhạt, chỉ là vết xước hoặc lấm chấm đơn lẻ không có dấu hiệu lây lan.
+  + Chỉ chọn "Không có" khi cây hoàn toàn khỏe mạnh, không có bất kỳ dấu vết sâu bệnh hại nào.
 
 ${stagesInfo}
 ${pestDiseasesInfo}
@@ -275,9 +284,14 @@ function parseImageValidationJson(
   // Validate detectedSeverityLevel
   let detectedSeverityLevel: string | null = null;
   if (parsed.isValid && parsed.detectedSeverityLevel) {
-    const matched = allowedSeverityLevels.find(
-      (s) => eqStr(s, parsed.detectedSeverityLevel)
-    );
+    const rawSev = parsed.detectedSeverityLevel.trim();
+    const matched =
+      allowedSeverityLevels.find((s) => eqStr(s, rawSev)) ||
+      allowedSeverityLevels.find(
+        (s) =>
+          rawSev.toLowerCase().includes(s.toLowerCase()) ||
+          s.toLowerCase().includes(rawSev.toLowerCase())
+      );
     if (matched) {
       detectedSeverityLevel = matched;
     } else {
@@ -436,6 +450,7 @@ function buildDiagnosisPromptText(cropType?: string) {
 3. Trích xuất CHÍNH XÁC tên các sản phẩm phù hợp từ danh mục giải pháp tham khảo và phân chia chúng thành các "bộ giải pháp" tương ứng nếu có nhiều lựa chọn (chữ "hoặc", "luân phiên"). Nếu "Không phun" hoặc không có sản phẩm phù hợp, để rỗng mảng.
 
 QUY TẮC QUAN TRỌNG VỀ NỘI DUNG TRẢ VỀ:
+- Đánh giá mức độ bệnh ("severity") sát với thực tế canh tác đồng ruộng: ưu tiên làm tròn lên mức nghiêm trọng hơn (ví dụ ranh giới giữa Nhẹ và Trung bình thì đánh giá Trung bình, giữa Trung bình và Nặng thì đánh giá Nặng) để nông dân có giải pháp can thiệp kịp thời, tránh đánh giá quá nhẹ làm trễ dịch bệnh.
 - TUYỆT ĐỐI KHÔNG nhắc đến các cụm từ nội bộ như "dữ liệu của VFC", "dữ liệu tham khảo của VFC", "tài liệu VFC", "trong tài liệu VFC là...", "hệ thống không có dữ liệu/giải pháp"... trong bất kỳ trường thông tin nào (disease, summary, reasons, vfcSolutionText).
 - Luôn trả lời trực tiếp với tư cách một chuyên gia nông nghiệp đang tư vấn cho nông dân. Nếu bệnh chưa có phác đồ cụ thể trong danh mục tham khảo, hãy trực tiếp đưa ra hướng dẫn canh tác/xử lý chung và khuyên bà con liên hệ kỹ sư nông nghiệp VFC để được tư vấn, TUYỆT ĐỐI KHÔNG giải thích là "VFC không có tài liệu/dữ liệu".
 - Tên bệnh ("disease") chỉ ghi tên bệnh rõ ràng, không kèm chú thích so sánh với tài liệu nội bộ.
