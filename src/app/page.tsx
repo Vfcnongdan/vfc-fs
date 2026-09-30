@@ -55,18 +55,19 @@ function LoginContent() {
     useRef<HTMLInputElement>(null),
     useRef<HTMLInputElement>(null),
   ];
+  const isVerifyingRef = useRef(false);
 
   // SSE real-time connection
   const { connectionId, otpEvent, resetOtpEvent } = useAuthSSE(phone);
 
-  // Cooldown countdown timer for OTP resend
+  // Cooldown countdown timer for OTP resend (tạm dừng khi hệ thống đang xử lý xác thực)
   useEffect(() => {
-    if (countdown <= 0) return;
+    if (countdown <= 0 || loading) return;
     const timer = setInterval(() => {
       setCountdown((prev) => prev - 1);
     }, 1000);
     return () => clearInterval(timer);
-  }, [countdown]);
+  }, [countdown, loading]);
 
   // Auto-redirect if already logged in + load last phone
   useEffect(() => {
@@ -151,7 +152,9 @@ function LoginContent() {
   async function handleVerifyOtp(currentOtp: string[]) {
     const fullOtp = currentOtp.join("");
     if (fullOtp.length !== 4) return;
+    if (loading || isVerifyingRef.current) return;
 
+    isVerifyingRef.current = true;
     setError("");
     setLoading(true);
     try {
@@ -170,6 +173,7 @@ function LoginContent() {
       otpRefs[0].current?.focus();
     } finally {
       setLoading(false);
+      isVerifyingRef.current = false;
     }
   }
 
@@ -348,7 +352,12 @@ function LoginContent() {
                   type="text"
                   inputMode="numeric"
                   maxLength={1}
-                  className="w-16 h-16 bg-gray-300 rounded-sm text-center text-3xl font-bold text-gray-800 outline-none focus:ring-2 focus:ring-vfc-gold"
+                  disabled={loading}
+                  className={`w-16 h-16 rounded-sm text-center text-3xl font-bold outline-none transition-all ${
+                    loading
+                      ? "bg-gray-200/80 text-gray-500 cursor-wait ring-1 ring-vfc-gold/50"
+                      : "bg-gray-300 text-gray-800 focus:ring-2 focus:ring-vfc-gold"
+                  }`}
                   value={digit}
                   onChange={(e) => handleOtpChange(index, e.target.value)}
                   onKeyDown={(e) => handleKeyDown(index, e)}
@@ -358,14 +367,23 @@ function LoginContent() {
               ))}
             </div>
 
-            <button
-              type="button"
-              disabled={loading || countdown > 0}
-              onClick={() => handleSendOtp()}
-              className="text-white font-bold underline underline-offset-4 mb-16 decoration-2 disabled:opacity-50 disabled:no-underline disabled:cursor-not-allowed transition"
-            >
-              {countdown > 0 ? `Gửi lại mã OTP sau (${countdown}s)` : "Gửi lại mã OTP"}
-            </button>
+            {loading ? (
+              <div className="flex items-center justify-center gap-3 mb-16 py-2 px-5 rounded-full bg-black/25 border border-white/20 shadow-inner">
+                <div className="w-4 h-4 border-2 border-vfc-gold border-t-transparent rounded-full animate-spin" />
+                <span className="text-vfc-gold text-sm font-bold tracking-wide">
+                  Đang xác thực mã OTP...
+                </span>
+              </div>
+            ) : (
+              <button
+                type="button"
+                disabled={loading || countdown > 0}
+                onClick={() => handleSendOtp()}
+                className="text-white font-bold underline underline-offset-4 mb-16 decoration-2 disabled:opacity-50 disabled:no-underline disabled:cursor-not-allowed transition"
+              >
+                {countdown > 0 ? `Gửi lại mã OTP sau (${countdown}s)` : "Gửi lại mã OTP"}
+              </button>
+            )}
 
             <p className="text-white text-sm font-bold text-center px-6">
               Vui lòng không tiết lộ OTP của bạn cho bất kỳ ai
@@ -373,11 +391,6 @@ function LoginContent() {
 
             {error && (
               <p className="text-red-300 text-sm mt-4 font-bold">{error}</p>
-            )}
-            {loading && (
-              <p className="text-white/70 text-sm mt-4 animate-pulse">
-                Đang kiểm tra...
-              </p>
             )}
           </div>
         )}
