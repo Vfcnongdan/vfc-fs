@@ -7,6 +7,7 @@ import {
   findProductByAiName,
 } from "@/services/productCacheDiagnosis";
 import { logger } from "@/lib/logger";
+import { selectDiverseImages, mapConcurrent } from "@/lib/referenceSampler";
 
 type AiProvider = "gemini" | "openrouter";
 
@@ -454,6 +455,11 @@ QUY TẮC QUAN TRỌNG VỀ NỘI DUNG TRẢ VỀ:
   + TÊN BỆNH & DỊCH HẠI: Chỉ dùng tên bệnh / sâu hại bằng tiếng Việt phổ thông chuẩn mực theo danh mục VFC (ví dụ: Bệnh đạo ôn lá, Sâu cuốn lá, Bệnh thán thư, Rầy nâu...). TUYỆT ĐỐI KHÔNG tự chêm tên danh pháp khoa học Latinh (như Magnaporthe, Pyricularia, Rhizoctonia, Spodoptera, Cnaphalocrocis...) vào bất kỳ trường thông tin nào (disease, summary, reasons, vfcSolutionText) nhằm tránh các tranh cãi học thuật về phân loại giai đoạn vô tính/hữu tính hoặc pha phát triển của sinh vật.
   + NGUYÊN TẮC QUAN SÁT THỰC ĐỊA: Chỉ mô tả tổn thương nhìn thấy trực quan trên ảnh (vết bệnh hình thoi, đốm mắt én, cháy chóp lá, hoại tử, thối nhũn, vết đục cắn, mô lá biến màu...) và tác động thực tế của vết hại lên bộ phận cây trồng. TUYỆT ĐỐI KHÔNG suy diễn các cơ chế sinh học vi mô ở mức tế bào nếu không thể quan sát bằng mắt thường.
   + CẤU TRÚC PHẦN "summary": Trình bày gãy gọn theo công thức chuẩn khuyến nông: [Tên bệnh tiếng Việt] + [Mức độ gây hại] + [Mô tả triệu chứng tổn thương thực tế trên cây] + [Hướng dẫn can thiệp kỹ thuật/phun dập dịch kịp thời]. Giọng văn ấm áp, thực tế, dứt khoát và chuẩn xác như chuyên gia kỹ thuật VFC trực tiếp tư vấn trên đồng ruộng.
+- NGUYÊN TẮC ĐỐI CHIẾU DANH MỤC THAM KHẢO & KÊ TOA THUỐC VFC:
+  + Danh mục tham khảo bao gồm các mẫu [CÓ ẢNH ĐỐI CHỨNG ĐÍNH KÈM BÊN DƯỚI] và các mẫu [CHỈ THAM KHẢO MÔ TẢ TRIỆU CHỨNG VĂN BẢN].
+  + Đối với mẫu có ảnh: hãy so sánh đối chiếu hình thái tổn thương trực quan giữa ảnh nông dân gửi và ảnh mẫu tham chiếu.
+  + Đối với mẫu chỉ có văn bản: hãy phân tích triệu chứng thực tế quan sát được trên ảnh nông dân và so khớp chéo với các đặc điểm bệnh học được mô tả để xác định bệnh chính xác ngay cả khi danh mục không có ảnh đối chứng.
+  + Sau khi đã xác định được bệnh phù hợp nhất, BẮT BUỘC trích xuất chính xác tên các sản phẩm VFC từ mục 'Giải pháp điều trị' của mẫu tham chiếu tương ứng vào danh sách "solutionSets" và giải thích công dụng trong "reasons".
 - Đánh giá mức độ bệnh ("severity") sát với thực tế canh tác đồng ruộng: ưu tiên làm tròn lên mức nghiêm trọng hơn (ví dụ ranh giới giữa Nhẹ và Trung bình thì đánh giá Trung bình, giữa Trung bình và Nặng thì đánh giá Nặng) để nông dân có giải pháp can thiệp kịp thời, tránh đánh giá quá nhẹ làm trễ dịch bệnh.
 - TUYỆT ĐỐI KHÔNG nhắc đến các cụm từ nội bộ như "dữ liệu của VFC", "dữ liệu tham khảo của VFC", "tài liệu VFC", "trong tài liệu VFC là...", "hệ thống không có dữ liệu/giải pháp"... trong bất kỳ trường thông tin nào (disease, summary, reasons, vfcSolutionText).
 - Luôn trả lời trực tiếp với tư cách một chuyên gia nông nghiệp đang tư vấn cho nông dân. Nếu bệnh chưa có phác đồ cụ thể trong danh mục tham khảo, hãy trực tiếp đưa ra hướng dẫn canh tác/xử lý chung và khuyên bà con liên hệ kỹ sư nông nghiệp VFC để được tư vấn, TUYỆT ĐỐI KHÔNG giải thích là "VFC không có tài liệu/dữ liệu".
@@ -657,27 +663,49 @@ export async function runAiDiagnosis(
     `[AI Diagnosis Filter] ID: ${diagnosisId} | Crop: ${cropType} | Stage: ${growthStage} | Pest: ${pestDisease ?? "any"} | Severity: ${severityLevel ?? "any"} -> ${relevantDiseases.length} records`
   );
 
-  if (relevantDiseases.length > MAX_REFERENCE_ITEMS) {
-    logger.warn(
-      `[AI Diagnosis Too Many References] ID: ${diagnosisId}, ${relevantDiseases.length} records -> randomly sampling ${MAX_REFERENCE_ITEMS}`
-    );
-    relevantDiseases = relevantDiseases
-      .sort(() => Math.random() - 0.5)
-      .slice(0, MAX_REFERENCE_ITEMS);
-  }
+  const maxRecords =
+    parseInt(process.env.AI_MAX_REFERENCE_RECORDS || "40", 10);
+  const maxImages =
+    parseInt(process.env.AI_MAX_REFERENCE_IMAGES || "8", 10);
+  const concurrency =
+    parseInt(process.env.AI_IMAGE_CONCURRENCY || "3", 10);
+
+  // 1. Giữ toàn bộ text records (áp dụng trần an toàn maxRecords để bảo vệ token)
+  const textRecords =
+    relevantDiseases.length > maxRecords
+      ? relevantDiseases.slice(0, maxRecords)
+      : relevantDiseases;
+
+  // 2. Chọn các mẫu ảnh đại diện bằng Diversity Sampling (Round-Robin theo pestDisease & severityLevel)
+  const recordsToFetchImages = selectDiverseImages(textRecords, maxImages);
+
+  logger.info(
+    `[Diversity Sampling] Diagnosis: ${diagnosisId} | Selected ${recordsToFetchImages.length}/${textRecords.length} diverse reference images`
+  );
 
   const prompt = buildDiagnosisPromptText(cropType);
 
   try {
-    const referenceData: ReferenceData[] = [];
-    for (const d of relevantDiseases) {
-      let b64 = null;
-      if (d.imageUrls && d.imageUrls.length > 0) {
-        b64 = await fetchAndOptimizeImage(d.imageUrls[0]);
+    // 3. Tải và tối ưu ảnh song song có kiểm soát concurrency
+    const imageMap = new Map<string, string>();
+    await mapConcurrent(recordsToFetchImages, concurrency, async (record) => {
+      if (record.imageUrls && record.imageUrls.length > 0) {
+        const b64 = await fetchAndOptimizeImage(record.imageUrls[0]);
+        if (b64) {
+          imageMap.set(record.id, b64);
+        }
       }
-      const text = `- Bệnh: ${d.detail} (${d.pestDisease})\n- Mức độ: ${d.severityLevel}\n- Mô tả: ${d.description}\n- Giải pháp điều trị: ${d.vfcSolution}`;
-      referenceData.push({ text, base64Image: b64 });
-    }
+    });
+
+    // 4. Cấu trúc referenceData với nhãn ID rõ ràng để AI đối chiếu chính xác
+    const referenceData: ReferenceData[] = textRecords.map((d, index) => {
+      const b64 = imageMap.get(d.id) || null;
+      const hasImgNotice = b64
+        ? " [CÓ ẢNH ĐỐI CHỨNG ĐÍNH KÈM BÊN DƯỚI]"
+        : " [CHỈ THAM KHẢO MÔ TẢ TRIỆU CHỨNG VĂN BẢN]";
+      const text = `[Mẫu tham chiếu #${index + 1}${hasImgNotice}]\n- Bệnh: ${d.detail} (${d.pestDisease})\n- Mức độ: ${d.severityLevel}\n- Mô tả triệu chứng: ${d.description}\n- Giải pháp điều trị: ${d.vfcSolution}`;
+      return { text, base64Image: b64 };
+    });
 
     const parsed = await withTimeout(
       analyzeWithFallback(prompt, base64Images, referenceData),
