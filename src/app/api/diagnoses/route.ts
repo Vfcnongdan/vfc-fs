@@ -197,38 +197,7 @@ async function legacyCreateDiagnosis(request: NextRequest, user: any) {
     const availableStages = cropOption?.growthStages ?? [];
 
     logger.info(
-      `[AI Diagnosis Stage Check] ID: ${diagnosis.id}, Crop: ${cropType}, detectedStage: ${validationResult.detectedGrowthStage}, availableStages: ${availableStages.length}`
-    );
-
-    if (availableStages.length > 0) {
-      const awaitingPayload = {
-        awaitingStage: true,
-        availableStages,
-        detectedGrowthStage: validationResult.detectedGrowthStage,
-        detectedPestDisease: validationResult.detectedPestDisease,
-        detectedSeverityLevel: validationResult.detectedSeverityLevel,
-      };
-      await prisma.plantDiagnosis.update({
-        where: { id: diagnosis.id },
-        data: {
-          rawAiResponse: awaitingPayload,
-          status: DiagnosisStatus.DONE,
-        },
-      });
-      logger.info(
-        `[POST AI Diagnosis] AWAITING_STAGE | ID: ${diagnosis.id} | Stages: ${availableStages.length} | Detected: ${validationResult.detectedGrowthStage} | Pest: ${validationResult.detectedPestDisease} | Severity: ${validationResult.detectedSeverityLevel}`
-      );
-      return apiOk({
-        id: diagnosis.id,
-        status: "AWAITING_STAGE",
-        awaitingStage: true,
-        availableStages,
-        detectedGrowthStage: validationResult.detectedGrowthStage,
-      });
-    }
-
-    logger.info(
-      `[POST AI Diagnosis] Start AI diagnosis | ID: ${diagnosis.id} | Crop: ${cropType} | Stage: ${growthStage ?? validationResult.detectedGrowthStage ?? "any"} | Pest: ${validationResult.detectedPestDisease ?? "any"} | Severity: ${validationResult.detectedSeverityLevel ?? "any"}`
+      `[POST AI Diagnosis] Start AI diagnosis (1-step Instant) | ID: ${diagnosis.id} | Crop: ${cropType}`
     );
     await runAiDiagnosis(
       diagnosis.id,
