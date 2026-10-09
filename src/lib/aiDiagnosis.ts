@@ -9,6 +9,7 @@ import {
 import { logger } from "@/lib/logger";
 import { selectDiverseImages, mapConcurrent } from "@/lib/referenceSampler";
 import { aggregateDiseases } from "@/lib/diseaseAggregator";
+import { uploadProblematicDiagnosisToDrive } from "@/lib/googleDriveSync";
 
 type AiProvider = "gemini" | "openrouter";
 
@@ -759,6 +760,36 @@ export async function runAiDiagnosis(
     });
 
     logger.info(`[AI Diagnosis Success] ID: ${diagnosisId}`);
+
+    // ─── Đồng bộ ca bệnh có vấn đề lên Google Drive (100% Async Non-blocking) ──
+    const isNoSolution = validProductIds.length === 0;
+    const isLowConfidence =
+      typeof parsed.confidence === "number" && parsed.confidence < 0.6;
+
+    if (
+      (isNoSolution || isLowConfidence) &&
+      base64Images &&
+      base64Images.length > 0
+    ) {
+      const caseType = isNoSolution ? "NO_SOLUTION" : "LOW_CONFIDENCE";
+      logger.info(
+        `[Google Drive Trigger] Triggering background upload for ${diagnosisId} | Case: ${caseType}`
+      );
+      void uploadProblematicDiagnosisToDrive({
+        diagnosisId,
+        cropType,
+        growthStage: finalAiResponse.growthStage || undefined,
+        disease: parsed.disease || "Chưa xác định",
+        confidence: parsed.confidence,
+        caseType,
+        summary: parsed.summary,
+        base64Image: base64Images[0],
+      }).catch((err) => {
+        logger.error(
+          `[Google Drive Trigger] Drive upload error for ${diagnosisId}: ${err.message}`
+        );
+      });
+    }
   } catch (err) {
     logger.error(`[AI Diagnosis Error] ID: ${diagnosisId}`, err);
     const needsClearerImage = err instanceof NeedsClearerImageError;

@@ -20,6 +20,7 @@
     "@types/qrcode": "^1.5.6",
     "bcryptjs": "^3.0.3",
     "csv-parse": "^6.2.1",
+    "googleapis": "^185.0.0",
     "html-to-image": "^1.11.13",
     "jose": "^6.2.3",
     "jsonwebtoken": "^9.0.3",
