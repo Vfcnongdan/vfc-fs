@@ -1,4 +1,3 @@
-import { google, drive_v3 } from "googleapis";
 import { Readable } from "stream";
 import sharp from "sharp";
 import { logger } from "@/lib/logger";
@@ -8,15 +7,12 @@ export interface ProblematicDiagnosisUploadParams {
   diagnosisId: string;
   cropType?: string;
   growthStage?: string;
-  disease: string;
+  disease?: string;
   confidence?: number;
   caseType: "NO_SOLUTION" | "LOW_CONFIDENCE";
   summary?: string;
   base64Image: string;
 }
-
-let cachedDriveClient: drive_v3.Drive | null = null;
-let isClientInitialized = false;
 
 function escapeXml(unsafe: string): string {
   return (unsafe || "").replace(/[<>&'"]/g, (c) => {
@@ -113,65 +109,6 @@ async function attachDiagnosisBannerToImage(
   }
 }
 
-function getGoogleDriveClient(): drive_v3.Drive | null {
-  if (isClientInitialized) return cachedDriveClient;
-
-  const enabled = process.env.ENABLE_GOOGLE_DRIVE_SYNC !== "false";
-  if (!enabled) {
-    isClientInitialized = true;
-    cachedDriveClient = null;
-    return null;
-  }
-
-  let clientEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-  let privateKey = process.env.GOOGLE_PRIVATE_KEY;
-  const rawJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
-  const keyFilePath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-
-  if (rawJson) {
-    try {
-      const parsed = JSON.parse(rawJson);
-      clientEmail = clientEmail || parsed.client_email;
-      privateKey = privateKey || parsed.private_key;
-    } catch (e: any) {
-      logger.warn(`[GoogleDriveSync] Failed to parse GOOGLE_SERVICE_ACCOUNT_JSON: ${e.message}`);
-    }
-  }
-
-  try {
-    let auth;
-    if (clientEmail && privateKey) {
-      auth = new google.auth.JWT({
-        email: clientEmail,
-        key: privateKey.replace(/\\n/g, "\n"),
-        scopes: ["https://www.googleapis.com/auth/drive.file"],
-      });
-    } else if (keyFilePath) {
-      auth = new google.auth.GoogleAuth({
-        keyFile: keyFilePath,
-        scopes: ["https://www.googleapis.com/auth/drive.file"],
-      });
-    } else {
-      logger.info(
-        "[GoogleDriveSync] Google Service Account credentials not provided. Google Drive Sync is in standby."
-      );
-      isClientInitialized = true;
-      cachedDriveClient = null;
-      return null;
-    }
-
-    cachedDriveClient = google.drive({ version: "v3", auth });
-    isClientInitialized = true;
-    logger.info("[GoogleDriveSync] Google Drive client initialized successfully.");
-    return cachedDriveClient;
-  } catch (err: any) {
-    logger.error(`[GoogleDriveSync] Initialization error: ${err.message}`);
-    isClientInitialized = true;
-    cachedDriveClient = null;
-    return null;
-  }
-}
-
 function generateFileName(params: ProblematicDiagnosisUploadParams): string {
   const toSlug = (s?: string) =>
     normalizeStr(s || "")
@@ -193,23 +130,25 @@ function generateFileName(params: ProblematicDiagnosisUploadParams): string {
 }
 
 /**
- * Tự động đồng bộ ca chẩn đoán có vấn đề lên Google Drive (100% Non-blocking)
+ * Tự động đồng bộ ca chẩn đoán có vấn đề lên Google Drive qua Google Apps Script Webhook (100% Non-blocking)
  */
 export async function uploadProblematicDiagnosisToDrive(
   params: ProblematicDiagnosisUploadParams
 ): Promise<string | null> {
-  const drive = getGoogleDriveClient();
-  if (!drive) return null;
+  const enabled = process.env.ENABLE_GOOGLE_DRIVE_SYNC !== "false";
+  if (!enabled) return null;
 
+  const webhookUrl = process.env.GOOGLE_DRIVE_WEBHOOK_URL;
   const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
-  if (!folderId) {
-    logger.warn(`[GoogleDriveSync] GOOGLE_DRIVE_FOLDER_ID not set. Skipping ${params.diagnosisId}.`);
+
+  if (!webhookUrl) {
+    logger.info(`[GoogleDriveSync] GOOGLE_DRIVE_WEBHOOK_URL not configured. Skipping ${params.diagnosisId}.`);
     return null;
   }
 
   try {
     logger.info(
-      `[GoogleDriveSync] Uploading to Google Drive | ID: ${params.diagnosisId} | Case: ${params.caseType} | Disease: ${params.disease}`
+      `[GoogleDriveSync] Uploading to Google Drive via Webhook | ID: ${params.diagnosisId} | Case: ${params.caseType} | Disease: ${params.disease}`
     );
 
     const cleanBase64 = params.base64Image.replace(/^data:image\/\w+;base64,/, "");
@@ -222,39 +161,44 @@ export async function uploadProblematicDiagnosisToDrive(
       `- Mã chẩn đoán: ${params.diagnosisId}`,
       `- Loại cây: ${params.cropType || "Chưa rõ"}`,
       `- Giai đoạn: ${params.growthStage || "Chưa rõ"}`,
-      `- Bệnh nhận diện: ${params.disease}`,
+      `- Bệnh nhận diện: ${params.disease || "Chưa rõ"}`,
       `- Độ tin cậy: ${params.confidence ? `${Math.round(params.confidence * 100)}%` : "Chưa rõ"}`,
       `- Lý do: ${params.caseType === "NO_SOLUTION" ? "Không tìm thấy thuốc/phác đồ VFC trong danh mục" : "Độ tin cậy của mô hình < 60%"}`,
       `- Tóm tắt AI: ${params.summary || "N/A"}`,
       `- Thời gian: ${new Date().toISOString()}`,
     ].join("\n");
 
-    const res = await drive.files.create({
-      requestBody: {
-        name: fileName,
-        parents: [folderId],
+    const response = await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        folderId: folderId || "",
+        fileName,
         description,
-        appProperties: {
-          diagnosisId: params.diagnosisId,
-          caseType: params.caseType,
-          cropType: params.cropType || "",
-          disease: params.disease,
-          confidence: String(params.confidence || ""),
-        },
-      },
-      media: {
-        mimeType: "image/jpeg",
-        body: Readable.from(finalBuffer),
-      },
-      fields: "id, name, webViewLink",
+        base64Image: finalBuffer.toString("base64"),
+        diagnosisId: params.diagnosisId,
+        caseType: params.caseType,
+        cropType: params.cropType,
+        disease: params.disease,
+        confidence: params.confidence,
+      }),
+      signal: AbortSignal.timeout(45000),
     });
 
-    const fileId = res.data.id || "";
-    logger.info(
-      `[GoogleDriveSync] Successfully uploaded! File: ${fileName} | ID: ${fileId} | Link: ${res.data.webViewLink || "N/A"}`
-    );
+    if (!response.ok) {
+      throw new Error(`Webhook returned HTTP ${response.status} (${response.statusText})`);
+    }
 
-    return fileId;
+    const data = (await response.json().catch(() => ({}))) as any;
+    if (data.status === "success" || data.fileId) {
+      logger.info(
+        `[GoogleDriveSync] Successfully uploaded! File: ${fileName} | ID: ${data.fileId || "N/A"} | Link: ${data.webViewLink || "N/A"}`
+      );
+      return data.fileId || "";
+    } else {
+      logger.warn(`[GoogleDriveSync] Webhook failed for ${params.diagnosisId}: ${data.message || JSON.stringify(data)}`);
+      return null;
+    }
   } catch (err: any) {
     logger.error(`[GoogleDriveSync] Failed to upload ${params.diagnosisId}: ${err.message}`, err);
     return null;
