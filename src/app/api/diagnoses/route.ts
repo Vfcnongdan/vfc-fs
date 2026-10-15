@@ -10,6 +10,7 @@ import {
 import { logger } from "@/lib/logger";
 
 export const maxDuration = 90;
+export const dynamic = "force-dynamic";
 
 const MICROSERVICE_URL =
   process.env.DIAGNOSIS_SERVICE_URL || "http://localhost:3001";

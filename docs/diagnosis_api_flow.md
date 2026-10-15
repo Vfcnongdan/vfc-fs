@@ -108,7 +108,7 @@ Input: diagnosisId, base64Images, cropType?, growthStage?, pestDisease?, severit
 - Giới hạn tối đa **7 records** tham khảo (random sampling nếu vượt)
 
 #### Bước 2: Gọi AI với fallback
-- **Primary**: Gemini API (`gemini-2.5-flash`)
+- **Primary**: Gemini API (`gemini-3.5-flash`)
 - **Fallback**: OpenRouter API (`google/gemini-flash-1.5`)
 - Timeout: **90 giây** → nếu timeout, trả `FAILED` + message yêu cầu chụp lại
 
