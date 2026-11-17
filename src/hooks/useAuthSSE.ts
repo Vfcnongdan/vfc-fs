@@ -60,7 +60,7 @@ export function useAuthSSE(phone?: string) {
         }
       });
 
-      // 3. Nhận sự kiện OTP Fallback 15s
+      // 3. Nhận sự kiện OTP Fallback 3s
       es.addEventListener('otp_fallback', (event: MessageEvent) => {
         try {
           const data: OtpEventPayload = JSON.parse(event.data);

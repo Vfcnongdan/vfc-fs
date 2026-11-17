@@ -457,57 +457,59 @@ function buildDiagnosisPromptText(cropType?: string, availableStages?: string[])
 1. Trả về tên bệnh hoặc triệu chứng lâm sàng thực tế quan sát được bằng mắt thường trên cây trồng. BẮT BUỘC dùng tên gọi bình dân, mộc mạc, thuần Việt; TUYỆT ĐỐI KHÔNG dùng tên khoa học, danh pháp tiếng Anh/Latinh hay từ ngữ mang tính bệnh học bác học, hàn lâm dễ bị bắt bẻ chuyên môn.
 2. Nhận diện giai đoạn sinh trưởng hiện tại của cây trồng từ hình ảnh trực quan (lá, thân, cành, nụ/hoa, trái, hạt...) hoặc suy luận từ tính chất tổn thương thực tế.
 3. Đề xuất hướng xử lý kỹ thuật rõ ràng, thiết thực và hữu ích cho bà con nông dân.
-4. Trích xuất tên các sản phẩm VFC phù hợp nếu bệnh thực sự trùng khớp với danh mục tham chiếu.
+4. Trích xuất tên các sản phẩm VFC phù hợp theo đúng khung 3 mức độ tin cậy bên dưới.
 
-QUY TẮC CỐT LÕI VỀ CHẨN ĐOÁN & ĐỐI CHIẾU DANH MỤC THAM KHẢO (CHỐNG GƯỢNG ÉP BỆNH):
-- QUY TẮC TRẢ VỀ TÊN BỆNH / TRIỆU CHỨNG LÂM SÀNG THỰC TẾ ("disease"):
-  + TRƯỜNG HỢP 1 - BỆNH LẠ / TRIỆU CHỨNG NGOÀI DANH MỤC / CHƯA RÕ NGUYÊN NHÂN (sinh lý, thời tiết, thiếu chất, sâu hại mới...):
-    * BẮT BUỘC trả về TÊN TRIỆU CHỨNG BÌNH DÂN, MỘC MẠC, THUẦN VIỆT theo đúng đặc điểm mắt thường quan sát được trên lá/thân/trái/rễ.
-    * Ví dụ chuẩn: "Triệu chứng cháy chóp lá", "Triệu chứng đốm vàng loang lổ", "Triệu chứng đốm mắt cua", "Triệu chứng vàng lá sọc dưa", "Triệu chứng xoăn đọt non", "Triệu chứng héo xanh rũ ngọn", "Triệu chứng lở cổ rễ", "Triệu chứng cắn phá của sâu lạ", "Triệu chứng thối nhũn bẹ", "Triệu chứng sọc nâu lạ"...
-    * TUYỆT ĐỐI KHÔNG dùng tên khoa học / danh pháp tiếng Anh hoặc Latinh (như Magnaporthe, Pyricularia, Rhizoctonia, Xanthomonas, Fusarium, Colletotrichum, Cercospora...).
-    * TUYỆT ĐỐI KHÔNG dùng từ ngữ mang tính bệnh học bác học, hàn lâm, đao to búa lớn (như "hoại tử biểu bì mô tế bào", "rối loạn sắc tố diệp lục", "thoái hóa mạch dẫn vascular", "suy giảm áp suất thẩm thấu", "tổn thương nhu mô lá"...).
-      -> LÝ DO: Ảnh chụp điện thoại ngoài đồng ruộng không thể thay thế xét nghiệm vi sinh trong phòng thí nghiệm; nếu phỏng đoán bằng thuật ngữ bác học hàn lâm thì nông dân không hiểu mà còn rất dễ bị các kỹ sư nông nghiệp hoặc bà con bắt bẻ, phản bác chuyên môn!
-    * KÊ TOA THẾ NÀO KHI GẶP TRƯỜNG HỢP NÀY?
+QUY TẮC CỐT LÕI VỀ CHẨN ĐOÁN & ĐỐI CHIẾU DANH MỤC THAM KHẢO (3 MỨC ĐỘ RÕ RÀNG):
+- QUY TẮC TRẢ VỀ TÊN BỆNH ("disease") & CÁCH KÊ TOA THEO 3 TRƯỜNG HỢP:
+  + TRƯỜNG HỢP 1 - BỆNH LẠ / TRIỆU CHỨNG NGOÀI DANH MỤC / MÂU THUẪN BẢN CHẤT VẾT HẠI (confidence: 0.30 - 0.59):
+    * Áp dụng khi vết hại khác biệt rõ về mặt hình thái so với mọi mẫu trong danh mục VFC, hoặc do sinh lý/thời tiết/thiếu chất/sâu bệnh lạ chưa có trong danh mục.
+    * Ví dụ phân biệt bắt buộc: Nếu trên lá là vết hoại tử lõm khô xuyên mô lá có viền nâu sẫm / quầng vàng (kiểu đốm mắt cua / vết chích cũ hóa nâu), TUYỆT ĐỐI KHÔNG gán vào bệnh rong tảo (vốn là lớp tảo nổi nhám như nhung trên bề mặt lá già, không lõm xuyên phiến lá).
+    * "disease": BẮT BUỘC trả về TÊN TRIỆU CHỨNG BÌNH DÂN, MỘC MẠC, THUẦN VIỆT theo đúng mắt thường quan sát được (ví dụ: "Triệu chứng cháy chóp lá", "Triệu chứng đốm mắt cua trên lá", "Triệu chứng đốm vàng loang lổ", "Triệu chứng xoăn đọt non", "Triệu chứng héo xanh rũ ngọn", "Triệu chứng lở cổ rễ"...).
+    * TUYỆT ĐỐI KHÔNG dùng tên khoa học / Latinh (như Magnaporthe, Pyricularia, Rhizoctonia, Xanthomonas, Fusarium, Colletotrichum, Cercospora...) hay thuật ngữ bác học hàn lâm (như "hoại tử biểu bì mô tế bào", "rối loạn sắc tố diệp lục", "thoái hóa mạch dẫn"...).
+    * KÊ TOA:
       - "solutionSets": BẮT BUỘC để mảng RỖNG [] (không được bịa thuốc hoặc lấy thuốc của bệnh khác).
       - "reasons": BẮT BUỘC để đối tượng rỗng {}.
       - "vfcSolutionText": Ghi rõ: "Khuyến cáo bà con liên hệ trực tiếp kỹ sư nông nghiệp VFC để được thăm đồng và hướng dẫn biện pháp kỹ thuật an toàn, phù hợp nhất."
-      - "confidence": BẮT BUỘC đánh giá THẤP trong khoảng 0.30 đến 0.55 (dưới 0.6) để hệ thống tự động ghi nhận và đồng bộ lưu trữ.
+      - "confidence": Chấm trong khoảng 0.30 đến 0.59.
 
-  + TRƯỜNG HỢP 2 - BỆNH TRÙNG KHỚP RÕ RÀNG VỚI DANH MỤC THAM KHẢO VFC (>80%):
-    * "disease": BẮT BUỘC dùng TÊN BỆNH TIẾNG VIỆT PHỔ THÔNG, DÂN DÃ, QUEN THUỘC theo đúng danh mục VFC (ví dụ: Bệnh đạo ôn lá, Bệnh thán thư, Bệnh đốm vằn, Bệnh lem lép hạt, Sâu cuốn lá, Rầy nâu...). TUYỆT ĐỐI KHÔNG kèm tên Latinh hay biệt ngữ học thuật.
-    * "solutionSets": Trích xuất chính xác tên các sản phẩm VFC từ mục 'Giải pháp VFC' của mẫu tham chiếu tương ứng và phân chia thành các bộ giải pháp.
+  + TRƯỜNG HỢP 2 - NGHI NGỜ / TƯƠNG ĐỒNG MỘT PHẦN - KÊ THUỐC THAM KHẢO KÈM DẶN DÒ KIỂM TRA TẠI VƯỜN (confidence: 0.60 - 0.78):
+    * Áp dụng khi vết hại có nét tương đồng đáng kể với một bệnh trong danh mục VFC nhưng ảnh chụp hơi xa/chưa đủ cận cảnh, vết bệnh mới chớm nở, hoặc ngoài thực tế dễ nhầm lẫn với một tác nhân gần giống khác nên cần bà con kiểm tra xác nhận thêm trên lá/thân/trái trước khi phun.
+    * "disease": Dùng tên phổ thông của bệnh nghi ngờ trong danh mục VFC kèm tiền tố thận trọng "Nghi ngờ ..." (ví dụ: "Nghi ngờ bệnh đốm rong", "Nghi ngờ bệnh cháy lá thán thư", "Nghi ngờ rầy xanh hại đọt"...). TUYỆT ĐỐI KHÔNG kèm tên Latinh.
+    * "solutionSets": VẪN trích xuất chính xác bộ sản phẩm VFC từ mẫu tham chiếu tương ứng để bà con có hướng tham khảo (không để rỗng).
+    * "reasons": Giải thích công dụng thực tế của từng sản phẩm nếu đúng tác nhân nghi ngờ.
+    * "summary" & "vfcSolutionText": KHÔNG khẳng định chắc nịch 100%, mà hướng dẫn bà con cách tự kiểm tra phân biệt nhanh ngay tại vườn trước khi phun (ví dụ: lật mặt dưới lá tìm côn trùng/lớp sáp, miết nhẹ mặt lá xem lớp tảo nổi nhám hay vết lõm khô...) và dặn kết nối kỹ sư VFC nếu kiểm tra thấy biểu hiện khác.
+    * "confidence": Chấm trong khoảng 0.60 đến 0.78.
+
+  + TRƯỜNG HỢP 3 - BỆNH ĐIỂN HÌNH, TRÙNG KHỚP RÕ RÀNG VỚI DANH MỤC VFC (confidence: 0.80 - 0.95):
+    * Chỉ áp dụng khi CẢ hình thái vết hại trên ảnh LẪN mô tả triệu chứng nhận diện trong danh mục VFC đều khớp rõ nét, điển hình, không có mâu thuẫn.
+    * "disease": BẮT BUỘC dùng TÊN BỆNH TIẾNG VIỆT PHỔ THÔNG, DÂN DÃ theo đúng danh mục VFC (ví dụ: Bệnh đạo ôn lá, Bệnh cháy lá thán thư, Bệnh khô vằn, Bệnh lem lép hạt, Sâu cuốn lá, Rầy xanh...). TUYỆT ĐỐI KHÔNG kèm tên Latinh.
+    * "solutionSets": Trích xuất chính xác tên các sản phẩm VFC từ mục 'Giải pháp VFC' của mẫu tham chiếu tương ứng.
     * "reasons": Giải thích công dụng thực tế của từng sản phẩm.
-    * "confidence": Đánh giá từ 0.75 đến 0.95 tùy theo độ điển hình của vết bệnh.
+    * "confidence": Đánh giá từ 0.80 đến 0.95 tùy theo độ điển hình của vết bệnh.
 
-- TUYỆT ĐỐI KHÔNG "CỐ ĐẤM ĂN XÔI" GƯỢNG ÉP: Nếu triệu chứng trên ảnh KHÔNG TRÙNG KHỚP RÕ RÀNG với bất kỳ mẫu nào trong danh mục tham chiếu, TUYỆT ĐỐI KHÔNG ĐƯỢC gán ghép bừa vào một bệnh gần giống để có thuốc kê toa.
-
-- THANG ĐO ĐỘ TIN CẬY (CONFIDENCE CALIBRATION) NGHIÊM NGẶT:
-  + >= 0.80: Vết hại rất điển hình, khớp rõ nét với mô tả bệnh học và ảnh đối chứng trong danh mục VFC.
-  + 0.60 - 0.79: Khớp một phần với bệnh trong danh mục VFC nhưng biểu hiện còn mờ nhạt hoặc ở giai đoạn chớm nở.
-  + < 0.60 (0.30 - 0.55): Bệnh lạ ngoài danh mục, triệu chứng không rõ ràng, nghi ngờ nhiều nguyên nhân (sinh lý/thiếu chất), hoặc không có đối chứng tương ứng trong danh mục VFC.
+- TUYỆT ĐỐI KHÔNG "CỐ ĐẤM ĂN XÔI" GƯỢNG ÉP LÊN MỨC >= 0.80: Nếu còn phân vân giữa hai tác nhân thì đưa về Trường hợp 2 (0.60 - 0.78, kèm hướng dẫn kiểm tra tại vườn); nếu bản chất vết hại khác hẳn mẫu tham chiếu thì đưa về Trường hợp 1 (0.30 - 0.59, không kê thuốc).
 
 - NGUYÊN TẮC NGÔN NGỮ KHUYẾN NÔNG & BẢO MẬT HỆ THỐNG:
-  + CẤU TRÚC PHẦN "summary": Trình bày ngắn gọn, mạch lạc: [Tên bệnh hoặc tên triệu chứng bình dân] + [Mức độ gây hại] + [Mô tả vết hại mắt thường nhìn thấy] + [Biện pháp canh tác đồng ruộng ngay lập tức] + [Lời khuyên kết nối kỹ sư VFC hỗ trợ thực địa]. Giọng văn ấm áp, mộc mạc, tự tin, chuyên nghiệp như kỹ sư VFC trực tiếp tư vấn trên ruộng. Tuyệt đối tránh thuật ngữ bác học hàn lâm trong mô tả.
+  + CẤU TRÚC PHẦN "summary": Trình bày ngắn gọn, mạch lạc: [Tên bệnh hoặc triệu chứng bình dân] + [Mức độ gây hại] + [Mô tả vết hại mắt thường nhìn thấy (+ cách kiểm tra thực tế tại vườn nếu ở mức nghi ngờ)] + [Biện pháp canh tác đồng ruộng ngay lập tức] + [Lời khuyên kết nối kỹ sư VFC hỗ trợ thực địa]. Giọng văn ấm áp, mộc mạc, chuyên nghiệp. Tuyệt đối tránh thuật ngữ bác học hàn lâm.
   + TUYỆT ĐỐI CẤM CÁC CÂU LÀM LỘ HỆ THỐNG HOẶC MANG SẮC THÁI TIÊU CỰC:
-    * TUYỆT ĐỐI KHÔNG dùng các câu phủ định, than phiền hoặc làm lộ cơ sở dữ liệu nội bộ như: "Hiện tại trong danh mục của VFC chưa có...", "VFC chưa có phác đồ đặc hiệu...", "hệ thống không có dữ liệu...", "chưa có thuốc VFC cho bệnh này...", "trong tài liệu tham khảo là...".
-    * Hãy luôn tư vấn với tư thế của một chuyên gia nông nghiệp hàng đầu: Khi chưa rõ nguyên nhân hoặc chưa có thuốc đặc hiệu trong danh mục, hãy hướng dẫn ngay biện pháp canh tác an toàn trước mắt (như giữ nước ổn định, tạm ngưng bón thừa đạm/phân bón lá kích thích, tỉa gom bộ phận bệnh để khoanh vùng) và giải thích rằng vì vết hại cần được kiểm tra đối chứng thực tế trên đồng ruộng để tránh dùng sai hoạt chất, bà con hãy liên hệ kỹ sư nông nghiệp VFC để được đồng hành hỗ trợ tận ruộng.
+    * TUYỆT ĐỐI KHÔNG dùng các câu làm lộ cơ sở dữ liệu nội bộ như: "Hiện tại trong danh mục của VFC chưa có...", "VFC chưa có phác đồ đặc hiệu...", "hệ thống không có dữ liệu...", "trong tài liệu tham khảo là...".
   + Đánh giá mức độ bệnh ("severity"): Sát thực tế đồng ruộng ("Không có" | "Nhẹ" | "Trung bình" | "Nặng" | "Hết cứu"), ưu tiên làm tròn lên mức nghiêm trọng hơn để nông dân không chủ quan.
   + Giai đoạn sinh trưởng ("growthStage"): Nhận diện giai đoạn của cây dựa trên hình ảnh${stagesHint}.
 
 Trả về kết quả dưới dạng JSON thuần túy (không có markdown code block) với format:
 { 
-  "disease": "Tên bệnh phổ thông (nếu khớp VFC) HOẶC Tên triệu chứng bình dân mắt thấy (nếu bệnh lạ/chưa rõ), KHÔNG dùng tên khoa học/thuật ngữ bác học", 
+  "disease": "Tên bệnh phổ thông (nếu khớp >=0.80), 'Nghi ngờ <tên bệnh>' (nếu 0.60-0.78), HOẶC Tên triệu chứng bình dân mắt thấy (nếu <0.60)", 
   "growthStage": "giai đoạn sinh trưởng phát hiện được từ ảnh hoặc null",
   "severity": "Không có | Nhẹ | Trung bình | Nặng | Hết cứu", 
-  "summary": "tóm tắt ngắn gọn hướng xử lý chuyên môn: mô tả vết hại + biện pháp canh tác ngay + hướng dẫn kết nối kỹ sư VFC (tuyệt đối không dùng câu tiêu cực/làm lộ danh mục hệ thống)", 
-  "confidence": 0.45,
-  "vfcSolutionText": "Câu giải pháp điều trị (nếu không có thuốc thì hướng dẫn liên hệ kỹ sư VFC thăm ruộng)",
+  "summary": "tóm tắt ngắn gọn hướng xử lý chuyên môn: mô tả vết hại + cách kiểm tra tại vườn (nếu nghi ngờ) + biện pháp canh tác ngay + hướng dẫn kết nối kỹ sư VFC", 
+  "confidence": 0.70,
+  "vfcSolutionText": "Câu giải pháp điều trị (nếu nghi ngờ thì dặn kiểm tra xác nhận trước khi phun; nếu không có thuốc thì hướng dẫn liên hệ kỹ sư VFC thăm ruộng)",
   "solutionSets": [
     { "name": "Bộ giải pháp", "products": ["tên sản phẩm 1", "tên sản phẩm 2"] }
   ],
   "reasons": { "tên sản phẩm 1": "công dụng rõ ràng của sản phẩm đối với tình trạng cây" }
 }
-(Lưu ý: Giá trị "confidence" 0.45 ở trên chỉ là ví dụ minh họa, bạn BẮT BUỘC phải tự chấm điểm thực tế từ 0.0 đến 1.0 theo thang đo độ tin cậy đã nêu).`;
+(Lưu ý: Giá trị "confidence" 0.70 ở trên chỉ là ví dụ minh họa, bạn BẮT BUỘC phải tự chấm điểm thực tế từ 0.0 đến 1.0 theo đúng 3 trường hợp đã nêu).`;
 }
 
 function parseAiJson(text: string, provider: AiProvider): AiDiagnosisResponse {
@@ -781,10 +783,10 @@ export async function runAiDiagnosis(
 
     logger.info(`[AI Diagnosis Success] ID: ${diagnosisId}`);
 
-    // ─── Đồng bộ ca bệnh có vấn đề lên Google Drive (100% Async Non-blocking) ──
+    // ─── Đồng bộ ca bệnh có vấn đề / nghi ngờ lên Google Drive (100% Async Non-blocking) ──
     const isNoSolution = validProductIds.length === 0;
     const isLowConfidence =
-      typeof parsed.confidence === "number" && parsed.confidence < 0.6;
+      typeof parsed.confidence === "number" && parsed.confidence < 0.79;
 
     if (
       (isNoSolution || isLowConfidence) &&
